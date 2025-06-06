@@ -1,0 +1,67 @@
+## Health
+GET http://localhost:8998/health
+
+
+### Create networks
+POST http://localhost:8998/api/v1/networks
+Authorization: Bearer token
+
+{
+  "name": "proxy-network",
+  "driver": "bridge",
+  "labels": {
+    "environment": "production"
+  }
+}
+
+### List networks
+GET http://localhost:8998/api/v1/networks
+Authorization: Bearer token
+
+### Create containers
+POST http://localhost:8998/api/v1/containers
+Authorization: Bearer token
+
+{
+  "name": "app",
+  "image": "nginx:1.25.3-alpine-slim",
+  "ports": {
+    "80": "8080"
+  },
+  "environment": [
+    "ENV=production",
+    "DEBUG=false"
+  ],
+  "networks": ["proxy-network"],
+  "subdomain": "app",
+  "labels": {
+    "version": "1.0.0"
+  },
+  "volumes": [
+    "app-vol:/etc/nginx/"
+  ],
+  "command": ["nginx", "-g", "daemon off;"]
+}
+
+### Start containers
+POST http://localhost:8998/api/v1/containers/start
+Authorization: Bearer token
+
+{
+  "container_id": "e52f0312b07d2"
+}
+
+### Delete containers
+DELETE http://localhost:8998/api/v1/containers
+Authorization: Bearer token
+
+{
+  "container_id": "132abc2cb2451b97c",
+  "force": true
+}
+
+### List containers
+GET http://localhost:8998/api/v1/containers
+Authorization: Bearer token
+
+###
