@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"maps"
 	"net/http"
 	"os"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	// "time"
 
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
@@ -194,12 +196,8 @@ func (ds *DockerService) createContainer(c *gin.Context) {
 
 	// Merge custom labels with Traefik labels
 	allLabels := make(map[string]string)
-	for k, v := range traefikLabels {
-		allLabels[k] = v
-	}
-	for k, v := range req.Labels {
-		allLabels[k] = v
-	}
+	maps.Copy(allLabels, traefikLabels)
+	maps.Copy(allLabels, req.Labels)
 
 	// Convert port mappings
 	// exposedPorts := make(map[string]struct{})
@@ -256,6 +254,9 @@ func (ds *DockerService) createContainer(c *gin.Context) {
 		}
 		networkConfig.EndpointsConfig = endpointsConfig
 	}
+
+	// TODO: pull the Docker image
+	ds.client.ImagePull(context.Background(), req.Image, image.PullOptions{})		
 
 	resp, err := ds.client.ContainerCreate(
 		context.Background(),
@@ -422,8 +423,10 @@ func (ds *DockerService) processDeployJobs() {
 			continue
 		}
 
+		// log.Printf("Job: %+v", job)
+		// log.Printf("Full message: %+v", msg)
 		log.Printf("Processing job %s with action %s (retry %d/%d)", job.ID, job.Action, retryCount, maxRetries)
-
+		
 		success := ds.processJob(job)
 		if success {
 			msg.Ack(false)
@@ -500,12 +503,8 @@ func (ds *DockerService) processJob(job DeployJob) bool {
 
 		traefikLabels := ds.generateTraefikLabels(job.Container.Subdomain, mainPort)
 		allLabels := make(map[string]string)
-		for k, v := range traefikLabels {
-			allLabels[k] = v
-		}
-		for k, v := range job.Container.Labels {
-			allLabels[k] = v
-		}
+		maps.Copy(allLabels, traefikLabels)
+		maps.Copy(allLabels, job.Container.Labels)
 
 		// Convert port mappings
 		// exposedPorts := make(map[string]struct{})
@@ -593,9 +592,9 @@ func main() {
 		DockerHost:    os.Getenv("DOCKER_HOST"),
 		AuthToken:     os.Getenv("AUTH_TOKEN"),
 		RabbitMQURL:   getEnvOrDefault("RABBITMQ_URL", "amqp://user:password@localhost:5672/default_vhost"),
-		QueueName:     getEnvOrDefault("QUEUE_NAME", "deploy_queue"),
+		QueueName:     getEnvOrDefault("QUEUE_NAME", "deploy.trigger"),
 		ServerPort:    getEnvOrDefault("SERVER_PORT", "8998"),
-		TraefikDomain: getEnvOrDefault("TRAEFIK_DOMAIN", "locci-cloud.localhost"),
+		TraefikDomain: getEnvOrDefault("TRAEFIK_DOMAIN", "locci.cloud.lan"),
 	}
 
 	if config.AuthToken == "" {

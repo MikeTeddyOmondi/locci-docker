@@ -18,29 +18,29 @@ Authorization: Bearer token
 GET http://localhost:8998/api/v1/networks
 Authorization: Bearer token
 
-### Create containers
+### Create containers - nginx:1.25.3-alpine-slim / ttl.sh/locci-static-1750543179281478200:1h
 POST http://localhost:8998/api/v1/containers
 Authorization: Bearer token
 
 {
-  "name": "app",
-  "image": "nginx:1.25.3-alpine-slim",
+  "name": "snake-game",
+  "image": "ttl.sh/locci-static-1752442848879018200:1h@sha256:19b7c6ac835f0567b2aa7d760955968bd4c4d43646eb4d51b8e8dded23c1377d",
   "ports": {
-    "80": "8080"
+    "80": "8000"
   },
   "environment": [
     "ENV=production",
     "DEBUG=false"
   ],
   "networks": ["proxy-network"],
-  "subdomain": "app",
+  "subdomain": "snake-game",
   "labels": {
     "version": "1.0.0"
   },
   "volumes": [
     "app-vol:/etc/nginx/"
   ],
-  "command": ["nginx", "-g", "daemon off;"]
+  "command": []
 }
 
 ### Start containers
@@ -48,7 +48,7 @@ POST http://localhost:8998/api/v1/containers/start
 Authorization: Bearer token
 
 {
-  "container_id": "e52f0312b07d2"
+  "container_id": "cbb8dc1c9d"
 }
 
 ### Delete containers
@@ -56,7 +56,7 @@ DELETE http://localhost:8998/api/v1/containers
 Authorization: Bearer token
 
 {
-  "container_id": "132abc2cb2451b97c",
+  "container_id": "0ad81c2036",
   "force": true
 }
 
