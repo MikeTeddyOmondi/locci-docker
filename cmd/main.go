@@ -62,12 +62,25 @@ type DeleteContainerRequest struct {
 
 // Job structure for RabbitMQ
 type DeployJob struct {
-	ID        string                 `json:"id"`
-	Action    string                 `json:"action"` // "create", "start", "delete", "create_network"
-	Container CreateContainerRequest `json:"container,omitempty"`
-	Network   CreateNetworkRequest   `json:"network,omitempty"`
-	Target    string                 `json:"target,omitempty"` // container_id for start/delete operations
-	// RetryCount int                    `json:"retry_count"` // The total count of retries for the job when it fails
+	Target      string                 `json:"target"`
+	Namespace   string                 `json:"namespace"`
+	Replicas    int                    `json:"replicas"`
+	Port        int                    `json:"port"`
+	Environment string                 `json:"environment"`
+	ID          string                 `json:"id"`
+	Action      string                 `json:"action"`
+	Container   CreateContainerRequest `json:"container,omitempty"`
+	Network     CreateNetworkRequest   `json:"network,omitempty"`
+	ProjectID   string                 `json:"projectId"`
+	TriggeredBy string                 `json:"triggeredBy"`
+	TriggeredAt string                 `json:"triggeredAt"`
+}
+
+// Raw RabbitMQ message
+type RabbitMQMessage struct {
+	ProjectID    string    `json:"projectId"`
+	DeployConfig DeployJob `json:"deployConfig"`
+	Timestamp    string    `json:"timestamp"`
 }
 
 // Service structure
@@ -256,7 +269,7 @@ func (ds *DockerService) createContainer(c *gin.Context) {
 	}
 
 	// TODO: pull the Docker image
-	ds.client.ImagePull(context.Background(), req.Image, image.PullOptions{})		
+	ds.client.ImagePull(context.Background(), req.Image, image.PullOptions{})
 
 	resp, err := ds.client.ContainerCreate(
 		context.Background(),
@@ -358,7 +371,7 @@ func (ds *DockerService) listNetworks(c *gin.Context) {
 	})
 }
 
-// RabbitMQ job processor
+// RabbitMQ Job processor
 func (ds *DockerService) processDeployJobs() {
 	conn, err := amqp.Dial(ds.config.RabbitMQURL)
 	if err != nil {
@@ -416,23 +429,44 @@ func (ds *DockerService) processDeployJobs() {
 			}
 		}
 
-		var job DeployJob
-		if err := json.Unmarshal(msg.Body, &job); err != nil {
-			log.Printf("Failed to unmarshal job: %v", err)
+		// Debug: Print raw message info
+		log.Printf("Raw message body: %s", string(msg.Body))
+
+		// Parse the wrapper message first
+		var rabbitMsg RabbitMQMessage
+		if err := json.Unmarshal(msg.Body, &rabbitMsg); err != nil {
+			log.Printf("Failed to unmarshal RabbitMQ message: %v", err)
 			msg.Nack(false, false)
 			continue
 		}
 
-		// log.Printf("Job: %+v", job)
-		// log.Printf("Full message: %+v", msg)
+		// Extract the actual deploy job from the wrapper
+		job := rabbitMsg.DeployConfig
+
+		// Debug: Print parsed values
+		log.Printf("Parsed job - ID: '%s', Action: '%s', ProjectID: '%s'", job.ID, job.Action, rabbitMsg.ProjectID)
+
+		// Validate required fields
+		if job.ID == "" {
+			log.Printf("Job ID is empty")
+			msg.Nack(false, false)
+			continue
+		}
+
+		if job.Action == "" {
+			log.Printf("Job Action is empty")
+			msg.Nack(false, false)
+			continue
+		}
+
 		log.Printf("Processing job %s with action %s (retry %d/%d)", job.ID, job.Action, retryCount, maxRetries)
-		
+
 		success := ds.processJob(job)
 		if success {
 			msg.Ack(false)
 			log.Printf("Job %s completed successfully", job.ID)
 		} else {
-			// Handle retry logic
+			// Handle retry logic (same as before)
 			if retryCount < maxRetries {
 				// Prepare new headers with incremented retry count
 				newHeaders := make(amqp.Table)
@@ -476,6 +510,8 @@ func (ds *DockerService) processDeployJobs() {
 // Process individual job
 func (ds *DockerService) processJob(job DeployJob) bool {
 	ctx := context.Background()
+
+	log.Printf("Processing job %s with action %s (Image %s)", job.ID, job.Action, job.Container.Image)
 
 	switch job.Action {
 	case "create_network":
@@ -594,7 +630,7 @@ func main() {
 		RabbitMQURL:   getEnvOrDefault("RABBITMQ_URL", "amqp://user:password@localhost:5672/default_vhost"),
 		QueueName:     getEnvOrDefault("QUEUE_NAME", "deploy.trigger"),
 		ServerPort:    getEnvOrDefault("SERVER_PORT", "8998"),
-		TraefikDomain: getEnvOrDefault("TRAEFIK_DOMAIN", "locci.cloud.lan"),
+		TraefikDomain: getEnvOrDefault("TRAEFIK_DOMAIN", "locci.cloud"),
 	}
 
 	if config.AuthToken == "" {
