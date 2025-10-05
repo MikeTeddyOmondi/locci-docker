@@ -3,14 +3,16 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"log"
+	"log/slog"
 	"maps"
 	"net/http"
 	"os"
 	"strings"
-
-	// "time"
+	"time"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
@@ -24,12 +26,13 @@ import (
 
 // Configuration
 type Config struct {
-	DockerHost    string
-	AuthToken     string
-	RabbitMQURL   string
-	QueueName     string
-	ServerPort    string
-	TraefikDomain string
+	DockerHost       string
+	AuthToken        string
+	RabbitMQURL      string
+	QueueName        string
+	ServerPort       string
+	TraefikDomain    string
+	DeployJobTimeout int
 }
 
 // Request structures
@@ -76,6 +79,18 @@ type DeployJob struct {
 	TriggeredAt string                 `json:"triggeredAt"`
 }
 
+func (dj DeployJob) validate() error {
+	if dj.ID == "" {
+		return errors.New("job ID is empty")
+	}
+
+	if dj.Action == "" {
+		return errors.New("job Action is empty")
+	}
+
+	return nil
+}
+
 // Raw RabbitMQ message
 type RabbitMQMessage struct {
 	ProjectID    string    `json:"projectId"`
@@ -87,6 +102,71 @@ type RabbitMQMessage struct {
 type DockerService struct {
 	client *client.Client
 	config *Config
+	log    *Logger
+}
+
+const (
+	maxRetries  int    = 3
+	retryHeader string = "x-retry-count"
+)
+
+type Logger struct {
+	handler slog.Handler
+}
+
+const (
+	LevelDebug slog.Level = slog.LevelDebug
+	LevelInfo  slog.Level = slog.LevelInfo
+	LevelWarn  slog.Level = slog.LevelWarn
+	LevelError slog.Level = slog.LevelError
+)
+
+func NewLogger(w io.Writer, minLevel slog.Level, logAttrs map[string]string) *Logger {
+	handler := slog.Handler(slog.NewJSONHandler(w, &slog.HandlerOptions{AddSource: true, Level: slog.Level(minLevel)}))
+
+	attrs := make([]slog.Attr, 0, len(logAttrs))
+
+	for k, v := range logAttrs {
+		attrs = append(attrs,
+			slog.Attr{
+				Key:   k,
+				Value: slog.StringValue(v),
+			},
+		)
+	}
+
+	handler = handler.WithAttrs(attrs)
+
+	return &Logger{
+		handler: handler,
+	}
+}
+
+func (log *Logger) write(ctx context.Context, level slog.Level, caller int, msg string, args ...any) {
+	r := slog.NewRecord(time.Now(), level, msg, 0)
+
+	r.Add(args...)
+
+	err := log.handler.Handle(ctx, r)
+	if err != nil {
+		log.Error(ctx, err.Error())
+	}
+}
+
+func (log *Logger) Debug(ctx context.Context, msg string, args ...any) {
+	log.write(ctx, LevelDebug, 3, msg, args...)
+}
+
+func (log *Logger) Info(ctx context.Context, msg string, args ...any) {
+	log.write(ctx, LevelInfo, 3, msg, args...)
+}
+
+func (log *Logger) Warn(ctx context.Context, msg string, args ...any) {
+	log.write(ctx, LevelWarn, 3, msg, args...)
+}
+
+func (log *Logger) Error(ctx context.Context, msg string, args ...any) {
+	log.write(ctx, LevelError, 3, msg, args...)
 }
 
 // Initialize Docker client
@@ -107,9 +187,12 @@ func NewDockerService(config *Config) (*DockerService, error) {
 		return nil, fmt.Errorf("failed to create Docker client: %w", err)
 	}
 
+	logger := NewLogger(os.Stdout, slog.LevelDebug, map[string]string{})
+
 	return &DockerService{
 		client: cli,
 		config: config,
+		log:    logger,
 	}, nil
 }
 
@@ -143,7 +226,6 @@ func AuthMiddleware(token string) gin.HandlerFunc {
 // Generate Traefik labels
 func (ds *DockerService) generateTraefikLabels(subdomain string, port string) map[string]string {
 	domain := fmt.Sprintf("%s.%s", subdomain, ds.config.TraefikDomain)
-	// serviceName := fmt.Sprintf("%s-service", subdomain)
 	serviceName := subdomain
 
 	labels := map[string]string{
@@ -159,9 +241,13 @@ func (ds *DockerService) generateTraefikLabels(subdomain string, port string) ma
 
 // Create network
 func (ds *DockerService) createNetwork(c *gin.Context) {
+	// Use the request context so that operations are automatically cancelled if the client's connection closes
+	// This helps to avoid wasting resources on requests whose response the client will never need
+	ctx := c.Request.Context()
+
 	var req CreateNetworkRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"invalid request body": err.Error()})
 		return
 	}
 
@@ -174,9 +260,11 @@ func (ds *DockerService) createNetwork(c *gin.Context) {
 		networkConfig.Driver = "bridge"
 	}
 
-	resp, err := ds.client.NetworkCreate(context.Background(), req.Name, networkConfig)
+	resp, err := ds.client.NetworkCreate(ctx, req.Name, networkConfig)
 	if err != nil {
+		ds.log.Error(ctx, "failed to create docker network", slog.String("error", err.Error()))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+
 		return
 	}
 
@@ -189,9 +277,11 @@ func (ds *DockerService) createNetwork(c *gin.Context) {
 
 // Create container
 func (ds *DockerService) createContainer(c *gin.Context) {
+	ctx := c.Request.Context()
+
 	var req CreateContainerRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"invalid request body": err.Error()})
 		return
 	}
 
@@ -213,15 +303,9 @@ func (ds *DockerService) createContainer(c *gin.Context) {
 	maps.Copy(allLabels, req.Labels)
 
 	// Convert port mappings
-	// exposedPorts := make(map[string]struct{})
-	// portBindings := make(map[string][]string)
 	exposedPorts := nat.PortSet{}
 	portBindings := nat.PortMap{}
 
-	// for containerPort, hostPort := range req.Ports {
-	// 	exposedPorts[containerPort+"/tcp"] = struct{}{}
-	// 	portBindings[containerPort+"/tcp"] = []string{hostPort}
-	// }
 	for containerPortStr, hostPortStr := range req.Ports {
 		// Create nat.Port for the container port (assuming TCP)
 		containerPort, err := nat.NewPort("tcp", containerPortStr)
@@ -269,10 +353,10 @@ func (ds *DockerService) createContainer(c *gin.Context) {
 	}
 
 	// TODO: pull the Docker image
-	ds.client.ImagePull(context.Background(), req.Image, image.PullOptions{})
+	ds.client.ImagePull(ctx, req.Image, image.PullOptions{})
 
 	resp, err := ds.client.ContainerCreate(
-		context.Background(),
+		ctx,
 		containerConfig,
 		hostConfig,
 		networkConfig,
@@ -281,6 +365,8 @@ func (ds *DockerService) createContainer(c *gin.Context) {
 	)
 
 	if err != nil {
+		ds.log.Error(ctx, "failed to create container", slog.String("error", err.Error()))
+
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -295,14 +381,18 @@ func (ds *DockerService) createContainer(c *gin.Context) {
 
 // Start container
 func (ds *DockerService) startContainer(c *gin.Context) {
+	ctx := c.Request.Context()
+
 	var req StartContainerRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"invalid request body": err.Error()})
 		return
 	}
 
-	err := ds.client.ContainerStart(context.Background(), req.ContainerID, container.StartOptions{})
+	err := ds.client.ContainerStart(ctx, req.ContainerID, container.StartOptions{})
 	if err != nil {
+		ds.log.Error(ctx, "failed to start container", slog.String("containerID", req.ContainerID), slog.String("error", err.Error()))
+
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -315,6 +405,8 @@ func (ds *DockerService) startContainer(c *gin.Context) {
 
 // Delete container
 func (ds *DockerService) deleteContainer(c *gin.Context) {
+	ctx := c.Request.Context()
+
 	var req DeleteContainerRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -323,14 +415,32 @@ func (ds *DockerService) deleteContainer(c *gin.Context) {
 
 	// Stop container first if it's running
 	if req.Force {
-		ds.client.ContainerStop(context.Background(), req.ContainerID, container.StopOptions{})
+		err := ds.client.ContainerStop(ctx, req.ContainerID, container.StopOptions{})
+		if err != nil {
+			ds.log.Error(
+				ctx,
+				"failed to forcefully stop container",
+				slog.String("containerID", req.ContainerID),
+				slog.String("error", err.Error()),
+			)
+
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 	}
 
-	err := ds.client.ContainerRemove(context.Background(), req.ContainerID, container.RemoveOptions{
+	err := ds.client.ContainerRemove(ctx, req.ContainerID, container.RemoveOptions{
 		Force: req.Force,
 	})
 
 	if err != nil {
+		ds.log.Error(
+			ctx,
+			"failed to delete container",
+			slog.String("containerID", req.ContainerID),
+			slog.String("error", err.Error()),
+		)
+
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -343,7 +453,8 @@ func (ds *DockerService) deleteContainer(c *gin.Context) {
 
 // List containers
 func (ds *DockerService) listContainers(c *gin.Context) {
-	containers, err := ds.client.ContainerList(context.Background(), container.ListOptions{
+	ctx := c.Request.Context()
+	containers, err := ds.client.ContainerList(ctx, container.ListOptions{
 		All: true,
 	})
 
@@ -359,8 +470,9 @@ func (ds *DockerService) listContainers(c *gin.Context) {
 
 // List networks
 func (ds *DockerService) listNetworks(c *gin.Context) {
-	networks, err := ds.client.NetworkList(context.Background(), network.ListOptions{})
+	ctx := c.Request.Context()
 
+	networks, err := ds.client.NetworkList(ctx, network.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -372,23 +484,32 @@ func (ds *DockerService) listNetworks(c *gin.Context) {
 }
 
 // RabbitMQ Job processor
-func (ds *DockerService) processDeployJobs() {
+func (ds *DockerService) processDeployJobs(ctx context.Context, errChan chan<- error) {
 	conn, err := amqp.Dial(ds.config.RabbitMQURL)
 	if err != nil {
-		log.Printf("Failed to connect to RabbitMQ: %v", err)
+		ds.log.Error(ctx, "failed to connect to RabbitMQ", slog.String("error", err.Error()))
+		errChan <- err
+
 		return
 	}
-	defer conn.Close()
+
+	defer func() {
+		if conn != nil {
+			conn.Close()
+		}
+	}()
 
 	ch, err := conn.Channel()
 	if err != nil {
-		log.Printf("Failed to open RabbitMQ channel: %v", err)
+		ds.log.Error(ctx, "failed to open RabbitMQ channel", slog.String("error", err.Error()))
+		errChan <- err
+
 		return
 	}
+
 	defer ch.Close()
 
-	// Declare queue
-	q, err := ch.QueueDeclare(
+	queue, err := ch.QueueDeclare(
 		ds.config.QueueName,
 		true,  // durable
 		false, // delete when unused
@@ -397,12 +518,14 @@ func (ds *DockerService) processDeployJobs() {
 		nil,   // arguments
 	)
 	if err != nil {
-		log.Printf("Failed to declare queue: %v", err)
+		ds.log.Error(ctx, "failed to declare queue", slog.String("error", err.Error()))
+		errChan <- err
+
 		return
 	}
 
-	msgs, err := ch.Consume(
-		q.Name,
+	messages, err := ch.Consume(
+		queue.Name,
 		"",    // consumer
 		false, // auto-ack
 		false, // exclusive
@@ -411,16 +534,15 @@ func (ds *DockerService) processDeployJobs() {
 		nil,   // args
 	)
 	if err != nil {
-		log.Printf("Failed to register consumer: %v", err)
+		ds.log.Error(ctx, "failed to register consumer", slog.String("error", err.Error()))
+		errChan <- err
+
 		return
 	}
 
-	const maxRetries = 3
-	const retryHeader = "x-retry-count"
+	ds.log.Info(ctx, "started processing deploy jobs from RabbitMQ", slog.String("queue", queue.Name))
 
-	log.Println("Started processing deploy jobs from RabbitMQ")
-
-	for msg := range msgs {
+	for msg := range messages {
 		// Extract current retry count from message headers
 		retryCount := 0
 		if count, ok := msg.Headers[retryHeader]; ok {
@@ -429,87 +551,104 @@ func (ds *DockerService) processDeployJobs() {
 			}
 		}
 
-		// Debug: Print raw message info
-		log.Printf("Raw message body: %s", string(msg.Body))
-
-		// Parse the wrapper message first
 		var rabbitMsg RabbitMQMessage
 		if err := json.Unmarshal(msg.Body, &rabbitMsg); err != nil {
-			log.Printf("Failed to unmarshal RabbitMQ message: %v", err)
+			ds.log.Error(ctx, "failed to unmarshal RabbitMQ message", slog.String("error", err.Error()))
 			msg.Nack(false, false)
+
 			continue
 		}
 
-		// Extract the actual deploy job from the wrapper
 		job := rabbitMsg.DeployConfig
 
-		// Debug: Print parsed values
-		log.Printf("Parsed job - ID: '%s', Action: '%s', ProjectID: '%s'", job.ID, job.Action, rabbitMsg.ProjectID)
-
-		// Validate required fields
-		if job.ID == "" {
-			log.Printf("Job ID is empty")
+		err := job.validate()
+		if err != nil {
+			ds.log.Error(ctx, "an error occured while validating job", slog.String("error", err.Error()))
 			msg.Nack(false, false)
+
 			continue
 		}
 
-		if job.Action == "" {
-			log.Printf("Job Action is empty")
-			msg.Nack(false, false)
-			continue
-		}
+		ds.log.Info(
+			ctx,
+			"processing job",
+			slog.String("jobID", job.ID),
+			slog.String("actioan", job.Action),
+			slog.Int("retryCount", retryCount),
+			slog.Int("maxRetries", maxRetries),
+		)
 
-		log.Printf("Processing job %s with action %s (retry %d/%d)", job.ID, job.Action, retryCount, maxRetries)
-
-		success := ds.processJob(job)
+		success := ds.processJob(ctx, job)
 		if success {
 			msg.Ack(false)
-			log.Printf("Job %s completed successfully", job.ID)
+			ds.log.Info(ctx, "job completed successfully", slog.String("jobID", job.ID))
 		} else {
-			// Handle retry logic (same as before)
-			if retryCount < maxRetries {
-				// Prepare new headers with incremented retry count
-				newHeaders := make(amqp.Table)
-				if msg.Headers != nil {
-					// Copy existing headers
-					for k, v := range msg.Headers {
-						newHeaders[k] = v
-					}
-				}
-				newHeaders[retryHeader] = retryCount + 1
-
-				// Requeue with updated headers
-				err = ch.Publish(
-					"",     // exchange
-					q.Name, // routing key
-					false,  // mandatory
-					false,  // immediate
-					amqp.Publishing{
-						DeliveryMode: amqp.Persistent,
-						ContentType:  "application/json",
-						Body:         msg.Body, // original body
-						Headers:      newHeaders,
-					},
-				)
-				if err != nil {
-					log.Printf("Failed to requeue job: %v", err)
-					msg.Nack(false, false)
-				} else {
-					msg.Ack(false) // Ack original message
-					log.Printf("Job %s requeued for retry (%d/%d)", job.ID, retryCount+1, maxRetries)
-				}
-			} else {
-				// Max retries exceeded
-				msg.Ack(false)
-				log.Printf("Job %s failed after %d retries - giving up", job.ID, maxRetries)
-			}
+			ds.retryFailedJob(ctx, retryCount, msg, ch, job.ID, queue.Name)
 		}
 	}
 }
 
+func (ds *DockerService) retryFailedJob(
+	ctx context.Context,
+	retryCount int,
+	msg amqp.Delivery,
+	ch *amqp.Channel,
+	jobID string,
+	queueName string,
+) {
+	if retryCount > maxRetries {
+		msg.Ack(false)
+		ds.log.Warn(
+			ctx,
+			"job failed after exceeding maximum retries",
+			slog.String("jobID", jobID),
+			slog.String("retryCount", retryHeader),
+			slog.Int("maxRetries", maxRetries),
+		)
+	}
+
+	// Prepare new headers with incremented retry count
+	newHeaders := make(amqp.Table, len(msg.Headers))
+	if msg.Headers != nil {
+		for k, v := range msg.Headers {
+			newHeaders[k] = v
+		}
+	}
+	newHeaders[retryHeader] = retryCount + 1
+
+	err := ch.Publish(
+		"",        // exchange
+		queueName, // routing key
+		false,     // mandatory
+		false,     // immediate
+		amqp.Publishing{
+			DeliveryMode: amqp.Persistent,
+			ContentType:  "application/json",
+			Body:         msg.Body, // original body
+			Headers:      newHeaders,
+		},
+	)
+	if err != nil {
+		ds.log.Error(ctx, "failed to requeue job", slog.String("jobID", jobID), slog.String("error", err.Error()))
+		msg.Nack(false, false)
+
+		return
+	}
+
+	msg.Ack(false) // Ack original message
+	ds.log.Info(
+		ctx,
+		"job requeued successfully for retry",
+		slog.String("jobID", jobID),
+		slog.Int("retryCount", retryCount),
+		slog.Int("maxRetries", maxRetries),
+	)
+}
+
 // Process individual job
-func (ds *DockerService) processJob(job DeployJob) bool {
-	ctx := context.Background()
+func (ds *DockerService) processJob(ctx context.Context, job DeployJob) bool {
+	ctx, cancel := context.WithTimeout(ctx, time.Second*time.Duration(ds.config.DeployJobTimeout))
+	defer cancel()
 
 	log.Printf("Processing job %s with action %s (Image %s)", job.ID, job.Action, job.Container.Image)
 
@@ -595,7 +734,7 @@ func (ds *DockerService) processJob(job DeployJob) bool {
 		return err == nil
 
 	default:
-		log.Printf("Unknown job action: %s", job.Action)
+		ds.log.Warn(ctx, "unknown job actioan", slog.String("action", job.Action))
 		return false
 	}
 }
@@ -618,10 +757,11 @@ func (ds *DockerService) healthCheck(c *gin.Context) {
 }
 
 func main() {
+	ctx := context.Background()
 	// Load configuration from environment variables
 	err := godotenv.Load()
 	if err != nil {
-		log.Println("Error loading .env file")
+		log.Fatalf("error loading .env file: %v", err)
 	}
 
 	config := &Config{
@@ -643,11 +783,34 @@ func main() {
 		log.Fatalf("Failed to initialize Docker service: %v", err)
 	}
 
+	errChan := make(chan error)
 	// Start RabbitMQ job processor in a separate goroutine
-	go dockerService.processDeployJobs()
+	go dockerService.processDeployJobs(ctx, errChan)
 
+	go func() {
+		if err := <-errChan; err != nil {
+			log.Fatalf("deployment job encountered an unrecoverable error: %v", err)
+		}
+	}()
+
+	dockerService.log.Info(
+		ctx,
+		"started docker wrapper service",
+		slog.String("port", config.ServerPort),
+		slog.String("Traefik domain", config.TraefikDomain),
+		slog.String("RabbitMQ", config.QueueName),
+	)
+
+	router := setupRouter(dockerService)
+	if err := router.Run(":" + config.ServerPort); err != nil {
+		log.Fatalf("failed to start server: %v", err)
+	}
+}
+
+func setupRouter(dockerService *DockerService) *gin.Engine {
+	ginMode := getEnvOrDefault("GIN_MODE", "debug")
 	// Setup Gin router
-	gin.SetMode(gin.ReleaseMode)
+	gin.SetMode(ginMode)
 	router := gin.Default()
 
 	// Health check endpoint (no auth required)
@@ -655,7 +818,7 @@ func main() {
 
 	// API routes with authentication
 	api := router.Group("/api/v1")
-	api.Use(AuthMiddleware(config.AuthToken))
+	api.Use(AuthMiddleware(dockerService.config.AuthToken))
 	{
 		// Network operations
 		api.POST("/networks", dockerService.createNetwork)
@@ -668,13 +831,7 @@ func main() {
 		api.GET("/containers", dockerService.listContainers)
 	}
 
-	log.Printf("Starting Docker wrapper service on port %s", config.ServerPort)
-	log.Printf("Traefik domain: %s", config.TraefikDomain)
-	log.Printf("RabbitMQ queue: %s", config.QueueName)
-
-	if err := router.Run(":" + config.ServerPort); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
-	}
+	return router
 }
 
 func getEnvOrDefault(key, defaultValue string) string {
