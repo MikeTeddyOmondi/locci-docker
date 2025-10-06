@@ -352,8 +352,12 @@ func (ds *DockerService) createContainer(c *gin.Context) {
 		networkConfig.EndpointsConfig = endpointsConfig
 	}
 
-	// TODO: pull the Docker image
-	ds.client.ImagePull(ctx, req.Image, image.PullOptions{})
+	err := ds.pullImage(ctx, req.Image)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+
+		return
+	}
 
 	resp, err := ds.client.ContainerCreate(
 		ctx,
@@ -377,6 +381,34 @@ func (ds *DockerService) createContainer(c *gin.Context) {
 		"warnings":     resp.Warnings,
 		"domain":       fmt.Sprintf("%s.%s", req.Subdomain, ds.config.TraefikDomain),
 	})
+}
+
+func (ds *DockerService) pullImage(ctx context.Context, imageName string) error {
+	body, err := ds.client.ImagePull(ctx, imageName, image.PullOptions{})
+	if err != nil {
+		ds.log.Error(ctx, "failed to pull docker image", slog.String("error", err.Error()))
+
+		return fmt.Errorf("failed to pull image: %w", err)
+	}
+
+	defer func() {
+		if body != nil {
+			body.Close()
+		}
+	}()
+
+	decoder := json.NewDecoder(body)
+	for decoder.More() {
+		var msg map[string]interface{}
+		if err := decoder.Decode(&msg); err != nil {
+			ds.log.Error(ctx, "decode error", slog.String("error", err.Error()))
+			break
+		}
+
+		ds.log.Info(ctx, "pulling image", slog.Any("progress", msg))
+	}
+
+	return nil
 }
 
 // Start container
