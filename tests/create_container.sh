@@ -10,4 +10,3 @@ curl -X POST http://localhost:8998/api/v1/containers \
     "environment": ["NGINX_HOST=app-01.locci-cloud.localhost"],
     "volumes": ["app-01-vol:/usr/share/nginx/html:ro"]
   }'
-
