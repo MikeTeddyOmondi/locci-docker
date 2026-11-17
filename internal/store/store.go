@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strings"
 
 	_ "github.com/tursodatabase/go-libsql"
 	"golang.org/x/crypto/bcrypt"
@@ -90,6 +91,13 @@ func Open(url string) (*Store, error) {
 	db, err := sql.Open("libsql", url)
 	if err != nil {
 		return nil, fmt.Errorf("open %s: %w", url, err)
+	}
+	// A local SQLite file allows one writer; concurrent writers from the pool
+	// (audit log, health checks) fail with "database is locked". One
+	// connection makes database/sql queue them instead. Remote libsql servers
+	// handle concurrency themselves.
+	if strings.HasPrefix(url, "file:") {
+		db.SetMaxOpenConns(1)
 	}
 	for _, q := range schema {
 		if _, err := db.Exec(q); err != nil {

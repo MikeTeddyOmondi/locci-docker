@@ -109,6 +109,9 @@ that is an API server, a web UI and a CLI.
 
 ### Fixed
 
+- Concurrent writes to a local SQLite database (audit log entries, health
+  checks) could fail with `database is locked`. A `file:` database now uses a
+  single connection so writes queue instead of failing.
 - Deploy jobs that hit the retry limit were acked and then republished anyway,
   so they retried forever and double-acked the message.
 - Creating a container failed whenever the pull failed, even if the image
