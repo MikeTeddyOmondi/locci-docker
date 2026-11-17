@@ -26,7 +26,7 @@ func (s *Server) createNetwork(c *gin.Context) {
 
 	resp, err := s.Docker.CreateNetwork(c.Request.Context(), spec)
 	if err != nil {
-		s.fail(c, http.StatusInternalServerError, err)
+		s.fail(c, statusFor(err), err)
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"network_id": resp.ID, "name": spec.Name, "warnings": resp.Warning})

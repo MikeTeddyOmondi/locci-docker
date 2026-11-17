@@ -20,10 +20,14 @@ func currentUser(c *gin.Context) store.User {
 	return user
 }
 
-// auth accepts the static AUTH_TOKEN or a user API token.
+// auth accepts the static AUTH_TOKEN or a user API token, from the
+// Authorization header or (for WebSockets, which can't set headers) ?token=.
 func (s *Server) auth(c *gin.Context) {
-	token, ok := strings.CutPrefix(c.GetHeader("Authorization"), "Bearer ")
-	if !ok || token == "" {
+	token, _ := strings.CutPrefix(c.GetHeader("Authorization"), "Bearer ")
+	if token == "" {
+		token = c.Query("token")
+	}
+	if token == "" {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing bearer token"})
 		return
 	}
