@@ -3,6 +3,7 @@
 	import { onMount } from 'svelte';
 	import '@xterm/xterm/css/xterm.css';
 	import { auth } from '$lib/api.js';
+	import { scope } from '$lib/env.svelte.js';
 
 	let { id, cmd = 'sh' } = $props();
 	let el;
@@ -30,7 +31,7 @@
 
 			const proto = location.protocol === 'https:' ? 'wss' : 'ws';
 			const q = new URLSearchParams({ cmd, token: auth.token });
-			ws = new WebSocket(`${proto}://${location.host}/api/v1/containers/${id}/exec/ws?${q}`);
+			ws = new WebSocket(`${proto}://${location.host}/api/v1${scope(`/containers/${id}/exec/ws`)}?${q}`);
 			ws.binaryType = 'arraybuffer';
 
 			const resize = () => {

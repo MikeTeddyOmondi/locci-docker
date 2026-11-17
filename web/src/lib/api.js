@@ -1,5 +1,6 @@
 // Tiny client for the locci API. The token lives in localStorage.
 import { goto } from '$app/navigation';
+import { scope } from '$lib/env.svelte.js';
 
 const KEY = 'locci_token';
 
@@ -13,9 +14,9 @@ export const auth = {
 	}
 };
 
-/** Calls /api/v1{path}; returns parsed JSON or throws Error(message). */
+/** Calls /api/v1{path} (scoped to the current environment); returns JSON or throws Error(message). */
 export async function api(method, path, body) {
-	const res = await fetch('/api/v1' + path, {
+	const res = await fetch('/api/v1' + scope(path), {
 		method,
 		headers: {
 			...(auth.token ? { Authorization: 'Bearer ' + auth.token } : {}),
@@ -41,7 +42,7 @@ export const del = (path) => api('DELETE', path);
 
 /** Streams a text endpoint line by line until the signal aborts. */
 export async function stream(path, onLine, signal) {
-	const res = await fetch('/api/v1' + path, {
+	const res = await fetch('/api/v1' + scope(path), {
 		headers: { Authorization: 'Bearer ' + auth.token },
 		signal
 	});

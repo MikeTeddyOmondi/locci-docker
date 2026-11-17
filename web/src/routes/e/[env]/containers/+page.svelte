@@ -14,6 +14,7 @@
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import CopyId from '$lib/components/CopyId.svelte';
 	import DataTable from '$lib/components/DataTable.svelte';
+	import { href } from '$lib/env.svelte.js';
 	import { get, post, del } from '$lib/api.js';
 	import { shortId, containerName } from '$lib/format.js';
 	import { attempt, confirm } from '$lib/session.svelte.js';
@@ -81,7 +82,7 @@
 
 <PageHeader kicker="Manifest 01 · Containers" title="Containers" description="Everything on the dock, live or idle.">
 	{#snippet actions()}
-		<Button href="/containers/new"><PlusIcon /> New container</Button>
+		<Button href={href('/containers/new')}><PlusIcon /> New container</Button>
 	{/snippet}
 </PageHeader>
 
@@ -112,7 +113,7 @@
 		<EmptyState icon={SearchIcon} title="No matches" description="Nothing on the dock matches that filter." />
 	{:else}
 		<EmptyState icon={ContainerIcon} title="The dock is empty" description="Create a container from any image to get started.">
-			<Button href="/containers/new" size="sm"><PlusIcon /> New container</Button>
+			<Button href={href('/containers/new')} size="sm"><PlusIcon /> New container</Button>
 		</EmptyState>
 	{/if}
 {:else}
@@ -132,7 +133,7 @@
 	>
 		{#snippet row(c)}
 			<Table.Cell class="pl-4">
-				<a href="/containers/{c.Id}" class="font-medium hover:text-primary">{containerName(c)}</a>
+				<a href={href(`/containers/${c.Id}`)} class="font-medium hover:text-primary">{containerName(c)}</a>
 				<div><CopyId value={c.Id} label={shortId(c.Id)} /></div>
 			</Table.Cell>
 			<Table.Cell><StatusBadge state={c.State} /></Table.Cell>
@@ -152,7 +153,7 @@
 		{#snippet card(c)}
 			<div class="flex items-start justify-between gap-3">
 				<div class="min-w-0">
-					<a href="/containers/{c.Id}" class="block truncate font-medium">{containerName(c)}</a>
+					<a href={href(`/containers/${c.Id}`)} class="block truncate font-medium">{containerName(c)}</a>
 					<div class="truncate font-mono text-xs text-muted-foreground">{c.Image}</div>
 				</div>
 				<StatusBadge state={c.State} />

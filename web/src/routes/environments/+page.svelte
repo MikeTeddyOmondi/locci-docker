@@ -1,0 +1,310 @@
+<script>
+	import { goto } from '$app/navigation';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
+	import * as Select from '$lib/components/ui/select/index.js';
+	import { Button, buttonVariants } from '$lib/components/ui/button/index.js';
+	import { Input } from '$lib/components/ui/input/index.js';
+	import { Label } from '$lib/components/ui/label/index.js';
+	import { Textarea } from '$lib/components/ui/textarea/index.js';
+	import { Badge } from '$lib/components/ui/badge/index.js';
+	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
+	import PlusIcon from '@lucide/svelte/icons/plus';
+	import ServerIcon from '@lucide/svelte/icons/server';
+	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
+	import StarIcon from '@lucide/svelte/icons/star';
+	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
+	import TrashIcon from '@lucide/svelte/icons/trash';
+	import PlugIcon from '@lucide/svelte/icons/plug';
+	import Loader2Icon from '@lucide/svelte/icons/loader-2';
+	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
+	import CircleXIcon from '@lucide/svelte/icons/circle-x';
+	import FileUpIcon from '@lucide/svelte/icons/file-up';
+	import KeyRoundIcon from '@lucide/svelte/icons/key-round';
+	import PageHeader from '$lib/components/PageHeader.svelte';
+	import FormDialog from '$lib/components/FormDialog.svelte';
+	import EmptyState from '$lib/components/EmptyState.svelte';
+	import { get, post, del } from '$lib/api.js';
+	import { bytes, ago } from '$lib/format.js';
+	import { attempt, confirm, session } from '$lib/session.svelte.js';
+	import { envs, loadEnvs, statusTone } from '$lib/env.svelte.js';
+
+	const isAdmin = $derived(session.user?.role === 'admin');
+
+	// Host details per environment name: undefined = loading, null = unavailable.
+	let details = $state({});
+
+	function loadDetails(list) {
+		for (const e of list) {
+			if (e.status === 'down') {
+				details[e.name] = null;
+				continue;
+			}
+			get(`/environments/${encodeURIComponent(e.name)}/info`)
+				.then((i) => (details[e.name] = i))
+				.catch(() => (details[e.name] = null));
+		}
+	}
+
+	async function refresh() {
+		const list = await attempt(loadEnvs);
+		if (list) loadDetails(list);
+	}
+	$effect(() => {
+		refresh();
+	});
+
+	const where = (e) => (e.url ? e.url : 'DOCKER_HOST or local socket');
+
+	async function setDefault(e) {
+		if (await attempt(() => post(`/environments/${encodeURIComponent(e.name)}/default`), `${e.label} is now the default`))
+			refresh();
+	}
+
+	async function remove(e) {
+		const ok = await confirm({
+			title: `Remove ${e.label}?`,
+			description: 'locci forgets this host and its stored keys. Nothing on the host itself is touched.',
+			action: 'Remove'
+		});
+		if (ok && (await attempt(() => del(`/environments/${encodeURIComponent(e.name)}`), `Removed ${e.label}`)))
+			refresh();
+	}
+
+	// ---- add dialog ----
+
+	const kinds = [
+		['ssh', 'SSH', 'Reach the Docker socket over SSH; no Docker port exposed'],
+		['tcp+tls', 'TCP + TLS', "Docker's TLS port (2376) with client certificates"],
+		['local', 'Local socket', 'A socket or URL reachable from this server']
+	];
+	const blank = () => ({ name: '', label: '', kind: 'ssh', url: '', tls_ca: '', tls_cert: '', tls_key: '', ssh_key: '' });
+
+	let addOpen = $state(false);
+	let f = $state(blank());
+	let test = $state(null); // { ok, host?, error? }
+	let testing = $state(false);
+
+	function openAdd() {
+		f = blank();
+		test = null;
+		addOpen = true;
+	}
+
+	// Any change to the connection invalidates an earlier test result.
+	$effect(() => {
+		void [f.kind, f.url, f.tls_ca, f.tls_cert, f.tls_key, f.ssh_key];
+		test = null;
+	});
+
+	const placeholder = $derived(
+		{ ssh: 'ssh://deploy@10.0.0.5', 'tcp+tls': 'tcp://10.0.0.5:2376', local: 'unix:///var/run/docker.sock (empty = DOCKER_HOST)' }[f.kind]
+	);
+
+	function body() {
+		const b = { name: f.name.trim(), label: f.label.trim(), kind: f.kind, url: f.url.trim() };
+		if (f.kind === 'tcp+tls') Object.assign(b, { tls_ca: f.tls_ca, tls_cert: f.tls_cert, tls_key: f.tls_key });
+		if (f.kind === 'ssh') b.ssh_key = f.ssh_key;
+		return b;
+	}
+
+	async function runTest() {
+		testing = true;
+		test = (await attempt(() => post('/environments/test', body()))) ?? null;
+		testing = false;
+	}
+
+	async function save() {
+		const b = body();
+		// Pin exactly the SSH host key that the test showed.
+		if (test?.ok && test.host?.ssh_host_key) b.ssh_host_key = test.host.ssh_host_key;
+		const saved = await attempt(() => post('/environments', b), `Added ${b.label || b.name}`);
+		if (saved) refresh();
+		return saved;
+	}
+
+	async function loadFile(field, e) {
+		const file = e.currentTarget.files?.[0];
+		if (file) f[field] = await file.text();
+		e.currentTarget.value = '';
+	}
+</script>
+
+<svelte:head><title>Environments · locci</title></svelte:head>
+
+<PageHeader kicker="Fleet · Hosts" title="Environments" description="Every Docker host this locci manages.">
+	{#snippet actions()}
+		<Button variant="outline" size="icon" onclick={refresh} aria-label="Refresh"><RefreshCwIcon /></Button>
+		{#if isAdmin}<Button onclick={openAdd}><PlusIcon /> Add environment</Button>{/if}
+	{/snippet}
+</PageHeader>
+
+{#if !envs.loaded}
+	<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+		{#each Array(3) as _}<Skeleton class="h-52 rounded-xl" />{/each}
+	</div>
+{:else if !envs.list.length}
+	<EmptyState icon={ServerIcon} title="No environments" description="Add a Docker host to get started." />
+{:else}
+	<ul class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+		{#each envs.list as e, i (e.name)}
+			{@const d = details[e.name]}
+			<li class="rise group relative flex flex-col overflow-hidden rounded-xl border bg-card transition-all hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/5" style="animation-delay: {i * 50}ms">
+				<div class="ribbed h-2 {e.status === 'up' ? 'text-ok' : e.status === 'down' ? 'text-destructive' : 'text-muted-foreground'} opacity-70"></div>
+				<div class="flex items-start justify-between gap-2 p-4 pb-2">
+					<a href="/e/{encodeURIComponent(e.name)}" class="min-w-0 flex-1 after:absolute after:inset-0">
+						<div class="flex items-center gap-2">
+							<span class="signal size-2 {statusTone(e.status)}"></span>
+							<span class="truncate font-heading text-lg font-semibold">{e.label}</span>
+						</div>
+						<div class="mt-0.5 font-mono text-xs text-muted-foreground">{e.name}</div>
+					</a>
+					<div class="relative z-10 flex items-center gap-1.5">
+						{#if e.is_default}<Badge variant="secondary" class="gap-1"><StarIcon class="size-3" />default</Badge>{/if}
+						{#if isAdmin}
+							<DropdownMenu.Root>
+								<DropdownMenu.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon-sm' })} aria-label="Actions for {e.label}">
+									<EllipsisIcon />
+								</DropdownMenu.Trigger>
+								<DropdownMenu.Content align="end" class="w-48">
+									<DropdownMenu.Item onclick={() => goto(`/e/${encodeURIComponent(e.name)}`)}><ServerIcon /> Open</DropdownMenu.Item>
+									{#if !e.is_default}
+										<DropdownMenu.Item onclick={() => setDefault(e)}><StarIcon /> Set as default</DropdownMenu.Item>
+									{/if}
+									<DropdownMenu.Item onclick={refresh}><RefreshCwIcon /> Check now</DropdownMenu.Item>
+									<DropdownMenu.Separator />
+									<DropdownMenu.Item variant="destructive" disabled={e.is_default} onclick={() => remove(e)}>
+										<TrashIcon /> Remove
+									</DropdownMenu.Item>
+								</DropdownMenu.Content>
+							</DropdownMenu.Root>
+						{/if}
+					</div>
+				</div>
+
+				<div class="flex flex-wrap items-center gap-1.5 px-4 text-xs text-muted-foreground">
+					<Badge variant="outline" class="font-mono">{e.kind}</Badge>
+					<span class="truncate font-mono" title={where(e)}>{where(e)}</span>
+				</div>
+
+				<div class="mt-auto px-4 pt-4 pb-4">
+					{#if d === undefined}
+						<div class="grid grid-cols-2 gap-2">
+							{#each Array(2) as _}<Skeleton class="h-10 rounded-md" />{/each}
+						</div>
+					{:else if d === null}
+						<p class="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
+							Unreachable{e.last_seen_at ? `, last seen ${ago(e.last_seen_at)}` : ''}
+						</p>
+					{:else}
+						<dl class="grid grid-cols-2 gap-2 text-xs">
+							<div class="rounded-md bg-muted/60 px-2 py-1.5"><dt class="kicker text-[0.55rem]">Docker</dt><dd class="truncate font-mono">{d.ServerVersion}</dd></div>
+							<div class="rounded-md bg-muted/60 px-2 py-1.5"><dt class="kicker text-[0.55rem]">Running</dt><dd class="font-mono"><span class="text-ok">{d.ContainersRunning}</span> of {d.Containers}</dd></div>
+						</dl>
+						<p class="mt-2 truncate text-xs text-muted-foreground" title="{d.OperatingSystem} · {d.Architecture}">
+							{d.NCPU} CPUs · {bytes(d.MemTotal)} · {d.OperatingSystem}
+						</p>
+					{/if}
+				</div>
+			</li>
+		{/each}
+	</ul>
+{/if}
+
+{#snippet pemField(field, label, hint)}
+	<div class="grid gap-2">
+		<div class="flex items-center justify-between">
+			<Label for="env-{field}">{label}</Label>
+			<label class="{buttonVariants({ variant: 'ghost', size: 'xs' })} cursor-pointer text-muted-foreground">
+				<FileUpIcon /> Load file
+				<input type="file" class="sr-only" onchange={(e) => loadFile(field, e)} />
+			</label>
+		</div>
+		<Textarea id="env-{field}" bind:value={f[field]} required placeholder="-----BEGIN ..." class="min-h-20 font-mono text-[0.7rem]" />
+		{#if hint}<p class="text-xs text-muted-foreground">{hint}</p>{/if}
+	</div>
+{/snippet}
+
+<FormDialog
+	bind:open={addOpen}
+	kicker="New berth"
+	title="Add an environment"
+	description="Connect another Docker host. Keys are stored encrypted and never shown again."
+	submitLabel="Save environment"
+	busyLabel="Saving"
+	icon={PlusIcon}
+	onsubmit={save}
+	class="sm:max-w-xl"
+>
+	<div class="grid gap-4 sm:grid-cols-2">
+		<div class="grid gap-2">
+			<Label for="env-name">Name</Label>
+			<Input id="env-name" bind:value={f.name} required pattern="[a-z0-9][a-z0-9\-]{'{'}0,62{'}'}" placeholder="edge" class="font-mono" />
+			<p class="text-xs text-muted-foreground">Used in URLs and the CLI. Lowercase, digits, dashes.</p>
+		</div>
+		<div class="grid gap-2">
+			<Label for="env-label">Display name</Label>
+			<Input id="env-label" bind:value={f.label} placeholder={f.name || 'Edge box'} />
+		</div>
+	</div>
+
+	<div class="grid gap-2">
+		<Label>Connection</Label>
+		<Select.Root type="single" bind:value={f.kind}>
+			<Select.Trigger class="w-full">{kinds.find(([k]) => k === f.kind)?.[1]}</Select.Trigger>
+			<Select.Content>
+				{#each kinds as [value, label, hint]}
+					<Select.Item {value} {label}>
+						<div><div>{label}</div><div class="text-xs text-muted-foreground">{hint}</div></div>
+					</Select.Item>
+				{/each}
+			</Select.Content>
+		</Select.Root>
+	</div>
+
+	<div class="grid gap-2">
+		<Label for="env-url">URL</Label>
+		<Input id="env-url" bind:value={f.url} required={f.kind !== 'local'} placeholder={placeholder} class="font-mono" />
+		{#if f.kind === 'ssh'}
+			<p class="text-xs text-muted-foreground">
+				Add a path for a non-default socket, e.g. <code>ssh://me@host/run/user/1000/docker.sock</code>. The server's sshd must allow
+				<code>AllowStreamLocalForwarding</code>.
+			</p>
+		{/if}
+	</div>
+
+	{#if f.kind === 'ssh'}
+		{@render pemField('ssh_key', 'Private key', 'An unencrypted deploy key whose public half is in the remote authorized_keys.')}
+	{:else if f.kind === 'tcp+tls'}
+		{@render pemField('tls_ca', 'CA certificate', '')}
+		<div class="grid gap-4 sm:grid-cols-2">
+			{@render pemField('tls_cert', 'Client certificate', '')}
+			{@render pemField('tls_key', 'Client key', '')}
+		</div>
+	{/if}
+
+	{#if test}
+		<div class="rounded-lg border p-3 text-sm {test.ok ? 'border-ok/30 bg-ok/5' : 'border-destructive/30 bg-destructive/5'}" role="status">
+			{#if test.ok}
+				<div class="flex items-center gap-2 font-medium text-ok"><CircleCheckIcon class="size-4" /> Connected to {test.host.name}</div>
+				<p class="mt-1 text-xs text-muted-foreground">
+					Docker {test.host.server_version} · {test.host.os} {test.host.arch} · {test.host.cpus} CPUs · {bytes(test.host.memory)} · {test.host.containers} containers
+				</p>
+				{#if test.host.ssh_fingerprint}
+					<p class="mt-2 flex items-start gap-1.5 text-xs">
+						<KeyRoundIcon class="mt-0.5 size-3.5 shrink-0" />
+						<span>Host key <code class="break-all">{test.host.ssh_fingerprint}</code>. Compare it with <code>ssh-keygen -lf</code> on the host; it is pinned when you save.</span>
+					</p>
+				{/if}
+			{:else}
+				<div class="flex items-center gap-2 font-medium text-destructive"><CircleXIcon class="size-4" /> Can't connect</div>
+				<p class="mt-1 text-xs break-words text-muted-foreground">{test.error}</p>
+			{/if}
+		</div>
+	{/if}
+
+	{#snippet extra()}
+		<Button type="button" variant="outline" onclick={runTest} disabled={testing || (f.kind !== 'local' && !f.url)}>
+			{#if testing}<Loader2Icon class="animate-spin" /> Testing{:else}<PlugIcon /> Test connection{/if}
+		</Button>
+	{/snippet}
+</FormDialog>

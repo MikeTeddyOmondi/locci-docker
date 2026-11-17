@@ -27,6 +27,7 @@
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import CopyId from '$lib/components/CopyId.svelte';
 	import Terminal from '$lib/Terminal.svelte';
+	import { href } from '$lib/env.svelte.js';
 	import { get, post, del, stream } from '$lib/api.js';
 	import { bytes, shortId } from '$lib/format.js';
 	import { attempt, confirm } from '$lib/session.svelte.js';
@@ -89,7 +90,7 @@
 				action: 'Remove'
 			});
 			if (ok && (await attempt(() => del(`/containers/${id}?force=true`), `Removed ${name}`)))
-				goto('/containers');
+				goto(href('/containers'));
 			return;
 		}
 		busy = true;
@@ -123,7 +124,7 @@
 
 <svelte:head><title>{name ?? 'Container'} · locci</title></svelte:head>
 
-<Button href="/containers" variant="ghost" size="sm" class="-ml-2 mb-2 text-muted-foreground">
+<Button href={href('/containers')} variant="ghost" size="sm" class="-ml-2 mb-2 text-muted-foreground">
 	<ChevronLeftIcon /> Containers
 </Button>
 

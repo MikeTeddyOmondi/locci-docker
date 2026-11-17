@@ -14,19 +14,25 @@
 	import ScrollTextIcon from '@lucide/svelte/icons/scroll-text';
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
 	import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
+	import ServerIcon from '@lucide/svelte/icons/server';
+	import EnvSwitcher from '$lib/components/EnvSwitcher.svelte';
 	import { session } from '$lib/session.svelte.js';
+	import { href as envHref } from '$lib/env.svelte.js';
 
 	let { onlogout } = $props();
 
+	// Fleet links stay inside the current environment; envHref reads
+	// envs.current, so they update when the environment changes.
 	const groups = $derived([
 		{
 			label: 'Fleet',
 			items: [
-				['/', 'Overview', GaugeIcon],
-				['/containers', 'Containers', ContainerIcon],
-				['/images', 'Images', LayersIcon],
-				['/networks', 'Networks', NetworkIcon],
-				['/volumes', 'Volumes', HardDriveIcon]
+				[envHref('/'), 'Overview', GaugeIcon],
+				[envHref('/containers'), 'Containers', ContainerIcon],
+				[envHref('/images'), 'Images', LayersIcon],
+				[envHref('/networks'), 'Networks', NetworkIcon],
+				[envHref('/volumes'), 'Volumes', HardDriveIcon],
+				['/environments', 'Environments', ServerIcon]
 			]
 		},
 		...(session.user?.role === 'admin'
@@ -42,21 +48,24 @@
 			: [])
 	]);
 
+	// The overview (/e/<env>) is active only on itself; sections match their subtree.
 	const active = (href) =>
-		href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(href);
+		href === envHref('/') ? page.url.pathname === href : page.url.pathname.startsWith(href);
 
 	const initials = $derived((session.user?.username ?? '?').slice(0, 2).toUpperCase());
 </script>
 
 <div class="flex h-full flex-col">
 	<div class="flex items-center justify-between gap-2 px-4 pt-5 pb-6">
-		<a href="/" class="flex items-center gap-2.5">
+		<a href={envHref('/')} class="flex items-center gap-2.5">
 			<Logo class="size-8" />
 			<span class="font-heading text-xl font-bold tracking-tight">locci</span>
 			<span class="kicker rounded border px-1.5 py-0.5 text-[0.6rem]">docker</span>
 		</a>
 		<ThemeToggle />
 	</div>
+
+	<div class="px-3 pb-5"><EnvSwitcher /></div>
 
 	<nav class="flex-1 space-y-6 overflow-y-auto px-3">
 		{#each groups as group}

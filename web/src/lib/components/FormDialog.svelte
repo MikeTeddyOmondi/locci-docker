@@ -14,7 +14,9 @@
 		busyLabel = 'Saving',
 		icon: Icon,
 		onsubmit,
-		children
+		children,
+		extra, // optional snippet shown at the start of the footer (e.g. a Test button)
+		class: className = 'sm:max-w-md'
 	} = $props();
 
 	let busy = $state(false);
@@ -31,7 +33,7 @@
 </script>
 
 <Dialog.Root bind:open>
-	<Dialog.Content class="overflow-hidden sm:max-w-md">
+	<Dialog.Content class="max-h-[90dvh] overflow-y-auto {className}">
 		<div class="ribbed absolute inset-x-0 top-0 h-1.5 text-primary" aria-hidden="true"></div>
 		<form onsubmit={submit} class="grid gap-5">
 			<Dialog.Header>
@@ -43,6 +45,7 @@
 			<div class="grid gap-4">{@render children()}</div>
 
 			<Dialog.Footer>
+				{#if extra}<div class="mr-auto">{@render extra()}</div>{/if}
 				<Dialog.Close>
 					{#snippet child({ props })}
 						<Button {...props} variant="outline" disabled={busy}>Cancel</Button>

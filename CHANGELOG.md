@@ -117,6 +117,17 @@ that is an API server, a web UI and a CLI.
     `locci env use` (`--clear` follows the server default again). The client
     rewrites Docker resource paths to `/environments/<env>/...`, so existing
     commands work against any host unchanged.
+  - Web UI: the fleet pages live under `/e/<env>/...` (dashboard,
+    containers, images, networks, volumes, logs, stats, console), and the API
+    client scopes Docker calls (including the terminal WebSocket) to that
+    environment. Old URLs such as `/containers/<id>` redirect to the last-used
+    or default environment, and an unknown environment shows a clear empty
+    state. The sidebar has an environment switcher with live status dots
+    that keeps you in the same section. A new Environments page shows a card
+    per host (status, Docker version, CPUs, memory, running containers, OS)
+    with admin actions to set the default, check now or remove, and an Add
+    dialog per connection kind with **Test connection**, PEM file loading and
+    the SSH fingerprint to compare before it is pinned.
 
 ### Changed
 

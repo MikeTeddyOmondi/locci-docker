@@ -15,6 +15,7 @@
 	import ConfirmHost from '$lib/components/ConfirmHost.svelte';
 	import { api, auth } from '$lib/api.js';
 	import { session } from '$lib/session.svelte.js';
+	import { envs, loadEnvs } from '$lib/env.svelte.js';
 
 	let { children } = $props();
 	let menuOpen = $state(false);
@@ -36,12 +37,22 @@
 				.catch(() => {});
 	});
 
+	// Environments (and their up/down dots) refresh on the server's 30s health cadence.
+	$effect(() => {
+		if (!session.user) return;
+		loadEnvs().catch(() => {});
+		const t = setInterval(() => loadEnvs().catch(() => {}), 30_000);
+		return () => clearInterval(t);
+	});
+
 	afterNavigate(() => (menuOpen = false));
 
 	async function logout() {
 		await api('POST', '/auth/logout').catch(() => {});
 		auth.token = null;
 		session.user = null;
+		envs.list = [];
+		envs.loaded = false;
 		goto('/login');
 	}
 </script>

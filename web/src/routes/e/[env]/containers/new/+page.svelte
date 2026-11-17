@@ -12,6 +12,7 @@
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import ShipIcon from '@lucide/svelte/icons/ship';
 	import PageHeader from '$lib/components/PageHeader.svelte';
+	import { href } from '$lib/env.svelte.js';
 	import { get, post } from '$lib/api.js';
 	import { parsePairs, lines } from '$lib/format.js';
 	import { attempt } from '$lib/session.svelte.js';
@@ -64,7 +65,7 @@
 			return c;
 		}, `Created ${f.name}`);
 		busy = false;
-		if (created?.container_id) goto(`/containers/${created.container_id}`);
+		if (created?.container_id) goto(href(`/containers/${created.container_id}`));
 	}
 
 	const netLabel = $derived(
@@ -78,7 +79,7 @@
 
 <svelte:head><title>New container · locci</title></svelte:head>
 
-<Button href="/containers" variant="ghost" size="sm" class="-ml-2 mb-2 text-muted-foreground">
+<Button href={href('/containers')} variant="ghost" size="sm" class="-ml-2 mb-2 text-muted-foreground">
 	<ChevronLeftIcon /> Containers
 </Button>
 <PageHeader kicker="Manifest 01 · New" title="Ship a container" description="Pulls the image if needed, then creates the container." />
@@ -184,7 +185,7 @@
 			<Card.Footer
 				class="fixed inset-x-0 bottom-0 z-20 gap-2 border-t bg-background/90 p-3 backdrop-blur-md lg:static lg:bg-transparent lg:p-6 lg:pt-0 lg:backdrop-blur-none"
 			>
-				<Button href="/containers" variant="outline" class="flex-1 lg:hidden">Cancel</Button>
+				<Button href={href('/containers')} variant="outline" class="flex-1 lg:hidden">Cancel</Button>
 				<Button type="submit" class="flex-1" disabled={busy}>
 					{#if busy}<Loader2Icon class="animate-spin" /> Pulling and creating{:else}<ShipIcon /> Create container{/if}
 				</Button>
