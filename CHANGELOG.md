@@ -59,6 +59,10 @@ that is an API server, a web UI and a CLI.
   (runs tests first), `push`, `changes`, `release` and `rename` (rewrites the
   Go module path).
 - **Tests** for the store, the auth flow and Docker-down behaviour.
+- **Documentation** in `docs/`: usage, environments (preparing TLS and SSH
+  hosts), CLI, API, Docker, configuration, security, OIDC (planned) and
+  development guides. The README links to them and its quick start now uses
+  `just setup` and Bun.
 - **Environments (multiple Docker hosts), in progress.**
   - `environments` table (name, kind `local`/`tcp+tls`/`ssh`, url, TLS CA and
     cert, an encrypted secret for the TLS key or SSH key, pinned SSH host key,

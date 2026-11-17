@@ -90,7 +90,7 @@ TLS keys and other secrets are encrypted at rest with AES-GCM using
 - [x] `host` field on deploy jobs (`environment` was already taken by senders)
 - [x] UI: switcher, environments page, add/test dialog, env-aware routes
 - [x] CLI: `env` commands, `-E/--environment` flag, saved default
-- [ ] tests: registry, routing, backward-compatible routes
+- [x] tests: registry, routing, backward-compatible routes
 - [ ] later: per-environment access for users (`environment_users`)
 - [ ] later: `agent` connection type (outbound tunnel)
 
