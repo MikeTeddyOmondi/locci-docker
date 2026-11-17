@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"os"
 	"time"
@@ -13,6 +12,7 @@ import (
 	"github.com/MikeTeddyOmondi/locci-docker/internal/docker"
 	"github.com/MikeTeddyOmondi/locci-docker/internal/jobs"
 	"github.com/MikeTeddyOmondi/locci-docker/internal/server"
+	"github.com/MikeTeddyOmondi/locci-docker/internal/store"
 )
 
 func serveCmd() *cobra.Command {
@@ -23,8 +23,14 @@ func serveCmd() *cobra.Command {
 			cfg := config.Load()
 			log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
-			if cfg.AuthToken == "" {
-				return errors.New("AUTH_TOKEN is required")
+			db, err := store.Open(cfg.DatabaseURL)
+			if err != nil {
+				return err
+			}
+			defer db.Close()
+
+			if users, _ := db.ListUsers(); len(users) == 0 && cfg.AuthToken == "" {
+				log.Warn("no users yet and no AUTH_TOKEN: create one with `locci user add <name> --admin`")
 			}
 
 			dk, err := docker.New(cfg.DockerHost, cfg.TraefikDomain, log)
@@ -49,7 +55,7 @@ func serveCmd() *cobra.Command {
 				}()
 			}
 
-			srv := &server.Server{Docker: dk, AuthToken: cfg.AuthToken, Log: log}
+			srv := &server.Server{Docker: dk, Store: db, AuthToken: cfg.AuthToken, Log: log}
 			log.Info("listening", "port", cfg.ServerPort, "domain", cfg.TraefikDomain)
 			return srv.Router(cfg.GinMode).Run(":" + cfg.ServerPort)
 		},

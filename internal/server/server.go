@@ -4,16 +4,17 @@ package server
 import (
 	"log/slog"
 	"net/http"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/MikeTeddyOmondi/locci-docker/internal/docker"
+	"github.com/MikeTeddyOmondi/locci-docker/internal/store"
 )
 
 type Server struct {
 	Docker    *docker.Service
-	AuthToken string
+	Store     *store.Store
+	AuthToken string // optional static admin token (AUTH_TOKEN)
 	Log       *slog.Logger
 }
 
@@ -24,8 +25,18 @@ func (s *Server) Router(mode string) *gin.Engine {
 	r.Use(gin.Logger(), gin.Recovery())
 
 	r.GET("/health", s.health)
+	r.POST("/api/v1/auth/login", s.login)
 
-	api := r.Group("/api/v1", s.auth)
+	api := r.Group("/api/v1", s.auth, s.audit)
+
+	api.GET("/auth/me", s.me)
+	api.POST("/auth/logout", s.logout)
+
+	admin := api.Group("", adminOnly)
+	admin.GET("/users", s.listUsers)
+	admin.POST("/users", s.createUser)
+	admin.DELETE("/users/:name", s.deleteUser)
+	admin.GET("/audit", s.listAudit)
 
 	// v1 routes kept exactly as before.
 	api.POST("/networks", s.createNetwork)
@@ -36,16 +47,6 @@ func (s *Server) Router(mode string) *gin.Engine {
 	api.GET("/containers", s.listContainers)
 
 	return r
-}
-
-// auth checks "Authorization: Bearer <token>".
-func (s *Server) auth(c *gin.Context) {
-	token, ok := strings.CutPrefix(c.GetHeader("Authorization"), "Bearer ")
-	if !ok || token == "" || token != s.AuthToken {
-		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid or missing bearer token"})
-		return
-	}
-	c.Next()
 }
 
 func (s *Server) health(c *gin.Context) {

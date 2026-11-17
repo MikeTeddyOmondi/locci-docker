@@ -17,6 +17,7 @@ type Config struct {
 	TraefikDomain    string
 	DeployJobTimeout int
 	GinMode          string
+	DatabaseURL      string
 }
 
 // Load reads .env if present, then the process environment.
@@ -32,6 +33,7 @@ func Load() Config {
 		TraefikDomain:    get("TRAEFIK_DOMAIN", "locci.cloud"),
 		DeployJobTimeout: getInt("DEPLOY_JOB_TIMEOUT", 1800),
 		GinMode:          get("GIN_MODE", "release"),
+		DatabaseURL:      get("DATABASE_URL", "file:locci.db"),
 	}
 }
 

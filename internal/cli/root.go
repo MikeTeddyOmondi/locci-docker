@@ -16,7 +16,7 @@ func Execute() {
 		SilenceErrors: false,
 	}
 
-	root.AddCommand(serveCmd())
+	root.AddCommand(serveCmd(), userCmd())
 
 	if err := root.Execute(); err != nil {
 		os.Exit(1)

@@ -2,3 +2,5 @@
 **/*.env
 docker-wrapper
 /locci
+*.db
+*.db-*
