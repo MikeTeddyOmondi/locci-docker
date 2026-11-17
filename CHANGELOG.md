@@ -70,6 +70,13 @@ that is an API server, a web UI and a CLI.
     `LOCCI_SECRET_KEY` (32 random bytes, base64). Without the key the server
     still runs; only saving a remote host's key is refused, with a message
     explaining how to generate one.
+  - `docker.NewWithOptions` reaches `tcp+tls` hosts with in-memory PEM
+    certificates and `ssh` hosts through `golang.org/x/crypto/ssh` (no `ssh`
+    binary or `~/.ssh` needed, so it works inside the container image). SSH
+    forwards to the remote Docker socket (`/var/run/docker.sock`, or a path in
+    the URL such as `ssh://me@host/run/user/1000/docker.sock` for rootless
+    Docker), pins the host key on first connect and refuses a changed key, and
+    redials a dropped connection. Keys must be unencrypted (deploy keys).
 
 ### Changed
 

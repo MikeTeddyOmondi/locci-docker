@@ -49,21 +49,14 @@ type Service struct {
 	Client *client.Client
 	Domain string // Traefik base domain, e.g. locci.cloud
 	Log    *slog.Logger
+
+	ssh *sshDialer // set for ssh:// hosts (see connect.go)
 }
 
 // New connects to host (or DOCKER_HOST / the local socket when empty).
+// Remote hosts with TLS or SSH credentials use NewWithOptions.
 func New(host, domain string, log *slog.Logger) (*Service, error) {
-	opts := []client.Opt{client.FromEnv, client.WithAPIVersionNegotiation()}
-	if host != "" {
-		opts = append(opts, client.WithHost(host))
-	}
-
-	cli, err := client.NewClientWithOpts(opts...)
-	if err != nil {
-		return nil, fmt.Errorf("docker client: %w", err)
-	}
-
-	return &Service{Client: cli, Domain: domain, Log: log}, nil
+	return NewWithOptions(Options{Host: host, Domain: domain, Log: log})
 }
 
 func (s *Service) Ping(ctx context.Context) error {
