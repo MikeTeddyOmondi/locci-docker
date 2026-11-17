@@ -12,6 +12,7 @@ import (
 
 	"github.com/MikeTeddyOmondi/locci-docker/internal/env"
 	"github.com/MikeTeddyOmondi/locci-docker/internal/secret"
+	"github.com/MikeTeddyOmondi/locci-docker/internal/sso"
 	"github.com/MikeTeddyOmondi/locci-docker/internal/store"
 )
 
@@ -37,7 +38,7 @@ func newTestServerWithKey(t *testing.T, box *secret.Box) (*httptest.Server, *sto
 	envs := &env.Registry{Store: db, Box: box, Domain: "example.test", Log: log}
 	t.Cleanup(envs.Close)
 
-	s := &Server{Envs: envs, Store: db, AuthToken: "static", Log: log}
+	s := &Server{Envs: envs, SSO: &sso.Service{Store: db, Box: box, Log: log}, Store: db, AuthToken: "static", Log: log}
 	ts := httptest.NewServer(s.Router("test"))
 	t.Cleanup(ts.Close)
 	return ts, db

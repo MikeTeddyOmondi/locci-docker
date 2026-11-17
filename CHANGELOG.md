@@ -166,6 +166,19 @@ that is an API server, a web UI and a CLI.
     the role follows membership on every sign-in. `internal/sso/ssotest` is a
     fake provider (discovery, JWKS, PKCE-checking token endpoint, userinfo)
     for tests.
+  - Routes. Public: `GET /auth/providers` (enabled providers and whether
+    password login is on), `GET /auth/oidc/:provider/start` and
+    `.../callback`, which answer 404 for providers that aren't enabled. The
+    browser lands on `/login#token=...` (a fragment, so the token never
+    reaches server logs); the CLI's loopback listener gets
+    `http://127.0.0.1:<port>/callback?token=...`. Sign-ins and failures go to
+    the audit log as `LOGIN`. Admin: `/sso/providers` (list, create, update,
+    delete, `test` runs discovery) with the redirect URI to register, and
+    `/sso/settings` to turn password login off, which is refused while no
+    provider is enabled; the last enabled provider can't be disabled or
+    removed while it is off. `LOCCI_PUBLIC_URL` fixes the base URL used in
+    redirect URIs; otherwise it comes from the request (`X-Forwarded-*`
+    aware).
 
 ### Changed
 

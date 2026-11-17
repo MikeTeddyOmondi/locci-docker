@@ -14,6 +14,7 @@ import (
 	"github.com/MikeTeddyOmondi/locci-docker/internal/jobs"
 	"github.com/MikeTeddyOmondi/locci-docker/internal/secret"
 	"github.com/MikeTeddyOmondi/locci-docker/internal/server"
+	"github.com/MikeTeddyOmondi/locci-docker/internal/sso"
 	"github.com/MikeTeddyOmondi/locci-docker/internal/store"
 )
 
@@ -78,7 +79,10 @@ func serveCmd() *cobra.Command {
 				}()
 			}
 
-			srv := &server.Server{Envs: envs, Store: db, AuthToken: cfg.AuthToken, Log: log}
+			// OIDC sign-in uses the same key for client secrets and its flow cookie.
+			sign := &sso.Service{Store: db, Box: box, Log: log}
+
+			srv := &server.Server{Envs: envs, SSO: sign, PublicURL: cfg.PublicURL, Store: db, AuthToken: cfg.AuthToken, Log: log}
 			log.Info("listening", "port", cfg.ServerPort, "domain", cfg.TraefikDomain)
 			return srv.Router(cfg.GinMode).Run(":" + cfg.ServerPort)
 		},

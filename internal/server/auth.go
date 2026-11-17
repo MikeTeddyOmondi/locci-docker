@@ -77,6 +77,11 @@ func (s *Server) login(c *gin.Context) {
 		return
 	}
 
+	if !s.Store.PasswordLogin() {
+		s.fail(c, http.StatusForbidden, errors.New("password login is turned off; sign in with single sign-on"))
+		return
+	}
+
 	user, err := s.Store.CheckPassword(req.Username, req.Password)
 	if err != nil {
 		s.fail(c, http.StatusUnauthorized, errors.New("wrong username or password"))

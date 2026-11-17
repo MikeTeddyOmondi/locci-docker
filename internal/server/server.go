@@ -12,12 +12,15 @@ import (
 
 	"github.com/MikeTeddyOmondi/locci-docker/internal/docker"
 	"github.com/MikeTeddyOmondi/locci-docker/internal/env"
+	"github.com/MikeTeddyOmondi/locci-docker/internal/sso"
 	"github.com/MikeTeddyOmondi/locci-docker/internal/store"
 	"github.com/MikeTeddyOmondi/locci-docker/internal/ui"
 )
 
 type Server struct {
 	Envs      *env.Registry // one Docker connection per environment
+	SSO       *sso.Service  // OIDC sign-in; inactive until a provider is enabled
+	PublicURL string        // LOCCI_PUBLIC_URL; empty = derived from each request
 	Store     *store.Store
 	AuthToken string // optional static admin token (AUTH_TOKEN)
 	Log       *slog.Logger
@@ -31,6 +34,12 @@ func (s *Server) Router(mode string) *gin.Engine {
 
 	r.GET("/health", s.health)
 	r.POST("/api/v1/auth/login", s.login)
+
+	// Single sign-on. These answer 404 for providers that aren't enabled, so
+	// with none set up only password login exists.
+	r.GET("/api/v1/auth/providers", s.authProviders)
+	r.GET("/api/v1/auth/oidc/:provider/start", s.ssoStart)
+	r.GET("/api/v1/auth/oidc/:provider/callback", s.ssoCallback)
 
 	api := r.Group("/api/v1", s.auth, s.audit)
 
@@ -66,6 +75,13 @@ func (s *Server) Router(mode string) *gin.Engine {
 	admin.POST("/users", s.createUser)
 	admin.DELETE("/users/:name", s.deleteUser)
 	admin.GET("/audit", s.listAudit)
+	admin.GET("/sso/providers", s.listProviders)
+	admin.POST("/sso/providers", s.createProvider)
+	admin.POST("/sso/providers/test", s.testProvider)
+	admin.PATCH("/sso/providers/:provider", s.updateProvider)
+	admin.DELETE("/sso/providers/:provider", s.deleteProvider)
+	admin.GET("/sso/settings", s.getSSOSettings)
+	admin.PUT("/sso/settings", s.putSSOSettings)
 
 	// Everything else is the embedded web UI (unknown /api paths stay JSON 404s).
 	webUI := ui.Handler()

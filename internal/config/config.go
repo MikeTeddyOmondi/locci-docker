@@ -19,6 +19,7 @@ type Config struct {
 	GinMode          string
 	DatabaseURL      string
 	SecretKey        string // LOCCI_SECRET_KEY, base64 32 bytes (internal/secret)
+	PublicURL        string // LOCCI_PUBLIC_URL, e.g. https://locci.example.com (OIDC redirect URIs)
 }
 
 // Load reads .env if present, then the process environment.
@@ -36,6 +37,7 @@ func Load() Config {
 		GinMode:          get("GIN_MODE", "release"),
 		DatabaseURL:      get("DATABASE_URL", "file:locci.db"),
 		SecretKey:        os.Getenv("LOCCI_SECRET_KEY"),
+		PublicURL:        os.Getenv("LOCCI_PUBLIC_URL"),
 	}
 }
 
