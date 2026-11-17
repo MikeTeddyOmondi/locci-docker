@@ -117,7 +117,7 @@
 			style="background-image: linear-gradient(oklch(1 0 0 / 5%) 1px, transparent 1px), linear-gradient(90deg, oklch(1 0 0 / 5%) 1px, transparent 1px); background-size: 28px 28px;"
 		></div>
 		<div class="relative flex items-center justify-between font-mono text-xs tracking-[0.2em] text-white/50 uppercase">
-			<span>Manifest · locci/dock</span>
+			<span>Manifest · locci/docker</span>
 			<span class="flex items-center gap-2"><span class="signal signal-live size-1.5 text-[oklch(0.76_0.17_152)]"></span>Harbour open</span>
 		</div>
 
