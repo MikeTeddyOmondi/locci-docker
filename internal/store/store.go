@@ -166,7 +166,7 @@ func (s *Store) CreateUser(username, password, role string) (User, error) {
 	return s.UserByName(username)
 }
 
-// CreateSSOUser creates a user without a password: password_hash stays ''
+// CreateSSOUser creates a user without a password: password_hash stays empty
 // (the column is NOT NULL and SQLite can't relax that in place), and
 // CheckPassword refuses an empty hash, so the account signs in only through
 // its identity provider until someone sets a password.
