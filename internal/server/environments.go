@@ -111,13 +111,39 @@ func notFoundOr500(err error) int {
 // testEnvironment connects to unsaved settings once and reports the host.
 //
 //	POST /api/v1/environments/test
+//
+// When editing, the body names the existing environment and may leave the
+// certificates and key blank: those are taken from the stored environment
+// (server side only, nothing is returned). With the same URL the pinned SSH
+// host key is enforced too, so a test also catches a changed host key.
 func (s *Server) testEnvironment(c *gin.Context) {
 	var req envRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		s.fail(c, http.StatusBadRequest, err)
 		return
 	}
-	o, err := s.Envs.PlainOptions(req.environment(), req.key(req.Kind))
+	e, key := req.environment(), req.key(req.Kind)
+	if stored, err := s.Store.EnvironmentByName(req.Name); err == nil && stored.Kind == req.Kind {
+		if e.URL == "" {
+			e.URL = stored.URL
+		}
+		if e.TLSCA == "" {
+			e.TLSCA = stored.TLSCA
+		}
+		if e.TLSCert == "" {
+			e.TLSCert = stored.TLSCert
+		}
+		if e.SSHHostKey == "" && e.URL == stored.URL && !req.ResetHostKey {
+			e.SSHHostKey = stored.SSHHostKey
+		}
+		if key == "" {
+			if key, err = s.Envs.Box.Open(stored.Secret); err != nil {
+				s.sealFailure(c, err)
+				return
+			}
+		}
+	}
+	o, err := s.Envs.PlainOptions(e, key)
 	if err == nil {
 		err = checkOptions(o)
 	}

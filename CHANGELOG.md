@@ -106,6 +106,10 @@ that is an API server, a web UI and a CLI.
     `LOCCI_SECRET_KEY` returns 412 with setup instructions. The default can't
     be deleted (409) and an environment's kind can't change. The name `test`
     is reserved.
+    When the test body names an existing environment, blank certificates and
+    key are taken from the stored one (server side only) and, for the same
+    URL, its pinned SSH host key is enforced, so edits can be tested without
+    re-entering secrets.
   - Deploy jobs accept an optional `deployConfig.host` naming the environment
     to deploy to; without it they use the current default, as before. The
     existing `environment` field is untouched, since senders already use it

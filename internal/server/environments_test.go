@@ -105,6 +105,15 @@ func TestEnvironmentAPI(t *testing.T) {
 		}
 	}
 
+	// Testing an existing environment without resending its key uses the stored one.
+	if code, out := call(t, "POST", api+"/environments/test", "static", map[string]any{"name": "edge", "kind": "ssh", "url": "ssh://deploy@127.0.0.1:1"}); code != 200 || out["ok"] != false {
+		t.Fatalf("test with stored key: %d %v", code, out)
+	}
+	// An unknown name with no key is still a validation error.
+	if code, _ := call(t, "POST", api+"/environments/test", "static", map[string]any{"name": "other", "kind": "ssh", "url": "ssh://deploy@127.0.0.1:1"}); code != 400 {
+		t.Fatalf("test without key: got %d", code)
+	}
+
 	// Update: label only keeps the secret; kind can't change.
 	if code, out := call(t, "PATCH", api+"/environments/edge", "static", map[string]any{"label": "Edge box"}); code != 200 || out["label"] != "Edge box" || out["has_secret"] != true {
 		t.Fatalf("patch label: %d %v", code, out)
