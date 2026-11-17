@@ -28,18 +28,20 @@ var upgrader = websocket.Upgrader{
 func (s *Server) execWS(c *gin.Context) {
 	cmd := strings.Fields(c.DefaultQuery("cmd", "sh"))
 
-	execID, hr, err := s.Docker.ExecTTY(c.Request.Context(), c.Param("id"), cmd)
-	if err != nil {
-		s.fail(c, statusFor(err), err)
-		return
-	}
-	defer hr.Close()
-
+	// Upgrade first so the origin check runs before anything executes.
 	ws, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		return // upgrader already wrote the error
 	}
 	defer ws.Close()
+
+	execID, hr, err := s.Docker.ExecTTY(c.Request.Context(), c.Param("id"), cmd)
+	if err != nil {
+		ws.WriteMessage(websocket.CloseMessage,
+			websocket.FormatCloseMessage(websocket.CloseInternalServerErr, err.Error()))
+		return
+	}
+	defer hr.Close()
 
 	// container -> browser
 	go func() {
