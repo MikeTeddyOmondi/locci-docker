@@ -25,7 +25,8 @@ type Job struct {
 	Namespace   string               `json:"namespace"`
 	Replicas    int                  `json:"replicas"`
 	Port        int                  `json:"port"`
-	Environment string               `json:"environment"`
+	Environment string               `json:"environment"`    // the sender's own label (e.g. production); not used here
+	Host        string               `json:"host,omitempty"` // locci environment to deploy to; empty = the default
 	ID          string               `json:"id"`
 	Action      string               `json:"action"`
 	Container   docker.ContainerSpec `json:"container,omitempty"`
@@ -46,8 +47,26 @@ type Consumer struct {
 	URL     string
 	Queue   string
 	Timeout time.Duration
-	Docker  *docker.Service
+	Docker  *docker.Service // used when Resolve is nil
+	// Resolve returns the Docker service for an environment name ("" = the
+	// default). The server wires it to the environment registry.
+	Resolve func(host string) (*docker.Service, error)
 	Log     *slog.Logger
+}
+
+// service picks the Docker host for a job.
+func (c *Consumer) service(job Job) (*docker.Service, error) {
+	if c.Resolve == nil {
+		if job.Host != "" {
+			return nil, fmt.Errorf("job %s targets host %q but this consumer has only one Docker host", job.ID, job.Host)
+		}
+		return c.Docker, nil
+	}
+	svc, err := c.Resolve(job.Host)
+	if err != nil {
+		return nil, fmt.Errorf("host %q: %w", job.Host, err)
+	}
+	return svc, nil
 }
 
 // Run blocks, consuming jobs until the connection drops or ctx is done.
@@ -103,7 +122,7 @@ func (c *Consumer) handle(ctx context.Context, ch *amqp.Channel, queue string, m
 		retries = int(n)
 	}
 
-	c.Log.Info("processing job", "id", job.ID, "action", job.Action, "retry", retries)
+	c.Log.Info("processing job", "id", job.ID, "action", job.Action, "host", job.Host, "retry", retries)
 
 	err := c.Process(ctx, job)
 	if err == nil {
@@ -145,17 +164,22 @@ func (c *Consumer) Process(ctx context.Context, job Job) error {
 	ctx, cancel := context.WithTimeout(ctx, c.Timeout)
 	defer cancel()
 
+	dk, err := c.service(job)
+	if err != nil {
+		return err
+	}
+
 	switch job.Action {
 	case "create_network":
-		_, err := c.Docker.CreateNetwork(ctx, job.Network)
+		_, err := dk.CreateNetwork(ctx, job.Network)
 		return err
 	case "create":
-		_, err := c.Docker.CreateContainer(ctx, job.Container)
+		_, err := dk.CreateContainer(ctx, job.Container)
 		return err
 	case "start":
-		return c.Docker.StartContainer(ctx, job.Target)
+		return dk.StartContainer(ctx, job.Target)
 	case "delete":
-		return c.Docker.RemoveContainer(ctx, job.Target, true)
+		return dk.RemoveContainer(ctx, job.Target, true)
 	default:
 		return fmt.Errorf("unknown action %q", job.Action)
 	}

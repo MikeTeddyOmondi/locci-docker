@@ -101,6 +101,10 @@ that is an API server, a web UI and a CLI.
     `LOCCI_SECRET_KEY` returns 412 with setup instructions. The default can't
     be deleted (409) and an environment's kind can't change. The name `test`
     is reserved.
+  - Deploy jobs accept an optional `deployConfig.host` naming the environment
+    to deploy to; without it they use the current default, as before. The
+    existing `environment` field is untouched, since senders already use it
+    for their own stage names.
 
 ### Changed
 

@@ -58,7 +58,9 @@ TLS keys and other secrets are encrypted at rest with AES-GCM using
 - **Backward compatibility:** the current `/api/v1/containers`, `/networks`, ...
   routes keep working and use the default environment, so existing
   integrations and RabbitMQ jobs don't change.
-- Deploy jobs get an optional `environment` field (default: the default environment).
+- Deploy jobs get an optional `host` field naming the environment (default: the
+  default environment). Their existing `environment` field is the sender's own
+  label (e.g. `production`) and is left alone.
 
 **Web UI**
 
@@ -85,7 +87,7 @@ TLS keys and other secrets are encrypted at rest with AES-GCM using
 - [x] `docker.New` options for `tcp+tls` and `ssh` connections
 - [x] environment CRUD + test routes (admin only)
 - [x] env-scoped resource routes; default-env aliases for the current routes
-- [ ] `environment` field on deploy jobs
+- [x] `host` field on deploy jobs (`environment` was already taken by senders)
 - [ ] UI: switcher, environments page, add/test dialog, env-aware routes
 - [ ] CLI: `env` commands, `--env` flag, saved default
 - [ ] tests: registry, routing, backward-compatible routes

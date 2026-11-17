@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/MikeTeddyOmondi/locci-docker/internal/config"
+	"github.com/MikeTeddyOmondi/locci-docker/internal/docker"
 	"github.com/MikeTeddyOmondi/locci-docker/internal/env"
 	"github.com/MikeTeddyOmondi/locci-docker/internal/jobs"
 	"github.com/MikeTeddyOmondi/locci-docker/internal/secret"
@@ -52,19 +53,21 @@ func serveCmd() *cobra.Command {
 			defer envs.Close()
 			go envs.Run(context.Background(), 30*time.Second)
 
-			// The deploy consumer uses the default environment.
-			dk, _, err := envs.Default()
-			if err != nil {
-				return err
-			}
-
 			if cfg.RabbitMQURL != "" {
 				consumer := &jobs.Consumer{
 					URL:     cfg.RabbitMQURL,
 					Queue:   cfg.QueueName,
 					Timeout: time.Duration(cfg.DeployJobTimeout) * time.Second,
-					Docker:  dk,
-					Log:     log,
+					// Jobs name an environment in "host"; empty means the default.
+					Resolve: func(host string) (*docker.Service, error) {
+						if host == "" {
+							svc, _, err := envs.Default()
+							return svc, err
+						}
+						svc, _, err := envs.Get(host)
+						return svc, err
+					},
+					Log: log,
 				}
 				go func() {
 					// Exit so the supervisor restarts us and the consumer reconnects.
