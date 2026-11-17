@@ -197,5 +197,5 @@ Smaller or longer-term items from earlier design discussions:
 - [ ] Volume file browser
 - [ ] Image builds with embedded BuildKit (containerd worker)
 - [ ] containerd runtime behind a `Runtime` interface (CNI networking, Traefik KV/HTTP provider for routing)
-- [ ] GitHub Actions–compatible CI on top of the build service
+- [ ] GitHub Actions compatible CI on top of the build service
 - [ ] Per-environment access for users (also listed in epic 1)
