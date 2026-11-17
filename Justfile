@@ -5,14 +5,14 @@ tidy:
     go mod tidy    
 
 build:
-    go build -o docker-wrapper ./cmd/main.go
+    go build -o locci ./cmd/locci
 
 run:
     just build
-    ./docker-wrapper
+    ./locci serve
 
 run-bin:
-    go run ./cmd/main.go
+    go run ./cmd/locci serve
 
 build-image:
     docker build -t ranckosolutionsinc/bundler-service-go:v1.0.0 .

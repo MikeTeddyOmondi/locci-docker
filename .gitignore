@@ -1,3 +1,4 @@
 ./docker-wrapper
 **/*.env
 docker-wrapper
+/locci

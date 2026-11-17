@@ -1,4 +1,4 @@
-module github.com/docker-wrapper
+module github.com/MikeTeddyOmondi/locci-docker
 
 go 1.24.1
 
@@ -6,10 +6,15 @@ require (
 	github.com/docker/docker v28.2.2+incompatible
 	github.com/gin-gonic/gin v1.10.1
 	github.com/joho/godotenv v1.5.1
+	github.com/spf13/cobra v1.10.2
 	github.com/streadway/amqp v1.1.0
 )
 
-require golang.org/x/time v0.12.0 // indirect
+require (
+	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+	github.com/spf13/pflag v1.0.9 // indirect
+	golang.org/x/time v0.12.0 // indirect
+)
 
 require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
