@@ -1,4 +1,4 @@
-// Package store keeps users, API tokens and the audit log in libsql.
+// Package store keeps users, API tokens, Docker environments and the audit log in libsql.
 //
 // DATABASE_URL can be a local file ("file:locci.db") or a remote
 // libsql/Turso URL ("libsql://<db>.turso.io?authToken=...").
@@ -62,6 +62,27 @@ var schema = []string{
 		path     TEXT NOT NULL,
 		status   INTEGER NOT NULL
 	)`,
+	// Docker hosts. secret is the TLS client key or SSH private key, encrypted
+	// with LOCCI_SECRET_KEY before it gets here (see internal/secret).
+	`CREATE TABLE IF NOT EXISTS environments (
+		id           INTEGER PRIMARY KEY,
+		name         TEXT NOT NULL UNIQUE,
+		label        TEXT NOT NULL DEFAULT '',
+		kind         TEXT NOT NULL,
+		url          TEXT NOT NULL DEFAULT '',
+		tls_ca       TEXT NOT NULL DEFAULT '',
+		tls_cert     TEXT NOT NULL DEFAULT '',
+		secret       TEXT NOT NULL DEFAULT '',
+		ssh_host_key TEXT NOT NULL DEFAULT '',
+		labels       TEXT NOT NULL DEFAULT '{}',
+		is_default   INTEGER NOT NULL DEFAULT 0,
+		status       TEXT NOT NULL DEFAULT 'unknown',
+		last_seen_at TEXT,
+		created_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+	)`,
+	// At most one default environment.
+	`CREATE UNIQUE INDEX IF NOT EXISTS environments_one_default
+		ON environments (is_default) WHERE is_default = 1`,
 }
 
 // Open connects and creates the tables if needed.

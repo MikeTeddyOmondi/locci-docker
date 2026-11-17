@@ -59,6 +59,13 @@ that is an API server, a web UI and a CLI.
   (runs tests first), `push`, `changes`, `release` and `rename` (rewrites the
   Go module path).
 - **Tests** for the store, the auth flow and Docker-down behaviour.
+- **Environments (multiple Docker hosts), in progress.**
+  - `environments` table (name, kind `local`/`tcp+tls`/`ssh`, url, TLS CA and
+    cert, an encrypted secret for the TLS key or SSH key, pinned SSH host key,
+    labels, default flag, health status). `locci serve` seeds a `local` default
+    on first start whose empty URL means "DOCKER_HOST or the local socket", so
+    existing installs behave as before. A partial unique index allows only one
+    default, and the default can't be deleted.
 
 ### Changed
 

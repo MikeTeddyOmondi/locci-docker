@@ -29,6 +29,11 @@ func serveCmd() *cobra.Command {
 			}
 			defer db.Close()
 
+			// First start: register this host as the "local" default environment.
+			if _, err := db.EnsureDefaultEnvironment(); err != nil {
+				return err
+			}
+
 			if users, _ := db.ListUsers(); len(users) == 0 && cfg.AuthToken == "" {
 				log.Warn("no users yet and no AUTH_TOKEN: create one with `locci user add <name> --admin`")
 			}
