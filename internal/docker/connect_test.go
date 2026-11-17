@@ -236,6 +236,13 @@ func TestSSHHost(t *testing.T) {
 	}
 	bad.Close()
 
+	// An unreachable SSH host reports the SSH cause, not the placeholder host.
+	gone, _ := NewWithOptions(Options{Host: "ssh://deploy@127.0.0.1:1", Log: quiet, SSH: &SSHOptions{PrivateKey: keyPEM}})
+	if err := gone.Ping(ctx(t)); err == nil || strings.Contains(err.Error(), "docker.invalid") || !strings.Contains(err.Error(), "127.0.0.1:1") {
+		t.Fatalf("expected the ssh dial error, got %v", err)
+	}
+	gone.Close()
+
 	// Bad configuration fails up front.
 	if _, err := NewWithOptions(Options{Host: "ssh://nouser-host", SSH: &SSHOptions{PrivateKey: keyPEM}}); err == nil {
 		t.Fatal("expected url without user to be rejected")

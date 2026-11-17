@@ -59,8 +59,16 @@ func New(host, domain string, log *slog.Logger) (*Service, error) {
 	return NewWithOptions(Options{Host: host, Domain: domain, Log: log})
 }
 
+// Ping checks the daemon is reachable. For SSH hosts the Docker client hides
+// the dial error behind "Cannot connect to the Docker daemon at
+// http://docker.invalid", so the SSH cause is returned instead.
 func (s *Service) Ping(ctx context.Context) error {
 	_, err := s.Client.Ping(ctx)
+	if err != nil && s.ssh != nil {
+		if cause := s.ssh.dialError(); cause != nil {
+			return cause
+		}
+	}
 	return err
 }
 

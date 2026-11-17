@@ -100,6 +100,7 @@ type sshDialer struct {
 	mu      sync.Mutex
 	conn    *ssh.Client
 	hostKey string // the key the server presented, authorized_keys format
+	lastErr error  // the real cause of the last failed dial (see Service.Ping)
 }
 
 func newSSH(o Options) (*Service, error) {
@@ -177,10 +178,15 @@ func (d *sshDialer) checkHostKey(pinned string) ssh.HostKeyCallback {
 	}
 }
 
-func (d *sshDialer) dial(ctx context.Context, _, _ string) (net.Conn, error) {
+func (d *sshDialer) dial(ctx context.Context, network, addr string) (net.Conn, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	c, err := d.dialLocked(ctx)
+	d.lastErr = err
+	return c, err
+}
 
+func (d *sshDialer) dialLocked(ctx context.Context) (net.Conn, error) {
 	for attempt := 0; attempt < 2; attempt++ {
 		if d.conn == nil {
 			conn, err := d.connect(ctx)
@@ -231,6 +237,13 @@ func (d *sshDialer) close() {
 		d.conn.Close()
 		d.conn = nil
 	}
+}
+
+// dialError returns the cause of the last failed SSH dial, or nil.
+func (d *sshDialer) dialError() error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.lastErr
 }
 
 // SSHHostKey returns the host key seen on the last SSH connection, or "".
