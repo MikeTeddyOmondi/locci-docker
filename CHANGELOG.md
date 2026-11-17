@@ -90,6 +90,17 @@ that is an API server, a web UI and a CLI.
     the four legacy container routes, keep their paths and payloads and use
     the default environment; `/health` checks the default environment.
     `locci serve` starts the registry and its 30s health loop.
+  - Environment API. Anyone signed in can `GET /environments` and
+    `GET /environments/:env`; admins can `POST /environments`,
+    `PATCH`/`DELETE /environments/:env`, `POST /environments/:env/default`
+    and `POST /environments/test`, which connects to unsaved settings and
+    returns the Docker version, OS, CPUs, memory and (for SSH) the host key
+    fingerprint. TLS and SSH keys are write-only: stored encrypted, answered
+    only as `has_secret`. Creating an SSH host pins its key right away when
+    reachable; changing its URL clears the pin. Saving a key without
+    `LOCCI_SECRET_KEY` returns 412 with setup instructions. The default can't
+    be deleted (409) and an environment's kind can't change. The name `test`
+    is reserved.
 
 ### Changed
 

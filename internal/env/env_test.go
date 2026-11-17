@@ -102,6 +102,9 @@ func TestRegistry(t *testing.T) {
 	if _, err := Test(ctx, o); err != nil {
 		t.Fatalf("test up: %v", err)
 	}
+	if Fingerprint("") != "" || Fingerprint("junk") != "" {
+		t.Fatal("expected empty fingerprints for bad input")
+	}
 	o.Host = "tcp://127.0.0.1:1"
 	if _, err := Test(ctx, o); err == nil {
 		t.Fatal("expected test against a closed port to fail")

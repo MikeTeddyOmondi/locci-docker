@@ -42,8 +42,11 @@ func (e Environment) HasSecret() bool { return e.Secret != "" }
 
 var nameRE = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
 
+// reserved names would clash with fixed API paths (POST /environments/test).
+var reserved = map[string]bool{"test": true}
+
 // ValidEnvironmentName reports whether name is a usable slug.
-func ValidEnvironmentName(name string) bool { return nameRE.MatchString(name) }
+func ValidEnvironmentName(name string) bool { return nameRE.MatchString(name) && !reserved[name] }
 
 const envColumns = `id, name, label, kind, url, tls_ca, tls_cert, secret, ssh_host_key,
 	labels, is_default, status, COALESCE(last_seen_at, ''), created_at`
@@ -66,7 +69,7 @@ func scanEnvironment(row interface{ Scan(...any) error }) (Environment, error) {
 
 func validateEnvironment(e Environment) error {
 	if !ValidEnvironmentName(e.Name) {
-		return errors.New("name must be lowercase letters, digits and dashes (max 63)")
+		return errors.New("name must be lowercase letters, digits and dashes (max 63), and not \"test\"")
 	}
 	switch e.Kind {
 	case KindLocal:

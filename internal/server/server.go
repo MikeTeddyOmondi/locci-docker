@@ -44,6 +44,17 @@ func (s *Server) Router(mode string) *gin.Engine {
 	def.DELETE("/containers", s.deleteContainerLegacy)
 	s.resourceRoutes(def)
 
+	// Environments: anyone signed in can list them (for the switcher); only
+	// admins can change them. Secrets are write-only.
+	api.GET("/environments", s.listEnvironments)
+	api.GET("/environments/:env", s.getEnvironment)
+	envAdmin := api.Group("/environments", adminOnly)
+	envAdmin.POST("", s.createEnvironment)
+	envAdmin.POST("/test", s.testEnvironment)
+	envAdmin.PATCH("/:env", s.updateEnvironment)
+	envAdmin.DELETE("/:env", s.deleteEnvironment)
+	envAdmin.POST("/:env/default", s.setDefaultEnvironment)
+
 	// The same routes for a chosen environment: /api/v1/environments/:env/...
 	scoped := api.Group("/environments/:env", s.useEnv)
 	scoped.GET("/info", s.systemInfo)

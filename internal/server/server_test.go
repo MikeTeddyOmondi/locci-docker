@@ -11,10 +11,17 @@ import (
 	"testing"
 
 	"github.com/MikeTeddyOmondi/locci-docker/internal/env"
+	"github.com/MikeTeddyOmondi/locci-docker/internal/secret"
 	"github.com/MikeTeddyOmondi/locci-docker/internal/store"
 )
 
 func newTestServer(t *testing.T) (*httptest.Server, *store.Store) {
+	t.Helper()
+	return newTestServerWithKey(t, nil)
+}
+
+// newTestServerWithKey is newTestServer with LOCCI_SECRET_KEY set (box != nil).
+func newTestServerWithKey(t *testing.T, box *secret.Box) (*httptest.Server, *store.Store) {
 	t.Helper()
 	db, err := store.Open("file:" + filepath.Join(t.TempDir(), "t.db"))
 	if err != nil {
@@ -27,7 +34,7 @@ func newTestServer(t *testing.T) (*httptest.Server, *store.Store) {
 	if _, err := db.CreateEnvironment(store.Environment{Name: "local", Kind: store.KindLocal, URL: "tcp://127.0.0.1:1"}); err != nil {
 		t.Fatal(err)
 	}
-	envs := &env.Registry{Store: db, Domain: "example.test", Log: log}
+	envs := &env.Registry{Store: db, Box: box, Domain: "example.test", Log: log}
 	t.Cleanup(envs.Close)
 
 	s := &Server{Envs: envs, Store: db, AuthToken: "static", Log: log}

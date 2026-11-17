@@ -33,6 +33,7 @@ func TestEnvironments(t *testing.T) {
 	// Validation.
 	bad := []Environment{
 		{Name: "Bad Name", Kind: KindLocal},
+		{Name: "test", Kind: KindLocal}, // reserved
 		{Name: "x", Kind: "ftp"},
 		{Name: "x", Kind: KindTLS, URL: "http://h:2376"},
 		{Name: "x", Kind: KindSSH, URL: "tcp://h"},
