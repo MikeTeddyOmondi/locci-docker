@@ -154,6 +154,18 @@ that is an API server, a web UI and a CLI.
     drop the `NOT NULL` in place; password login refuses an empty hash, and
     `locci user passwd` can give such a user a password later. Users report
     `has_password`. Password login stays on by default.
+  - `internal/sso` (`go-oidc` v3, `x/oauth2`): authorization code flow with
+    PKCE. State, nonce and verifier travel in a cookie sealed with
+    `LOCCI_SECRET_KEY` and expire after 10 minutes; the ID token's issuer,
+    audience, expiry and nonce are verified, and email or groups missing from
+    it are read from userinfo. Users are found by linked identity, else by an
+    existing username equal to the verified email (then linked), else created
+    when the provider allows it (username: verified email, preferred username
+    or `<provider>-<subject>`, with a suffix on clashes). An allowed-domains
+    list requires a verified email in one of them. With an admin group set,
+    the role follows membership on every sign-in. `internal/sso/ssotest` is a
+    fake provider (discovery, JWKS, PKCE-checking token endpoint, userinfo)
+    for tests.
 
 ### Changed
 

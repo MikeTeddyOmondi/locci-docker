@@ -3,13 +3,16 @@ module github.com/MikeTeddyOmondi/locci-docker
 go 1.24.1
 
 require (
+	github.com/coreos/go-oidc/v3 v3.17.0
 	github.com/docker/docker v28.2.2+incompatible
 	github.com/gin-gonic/gin v1.10.1
+	github.com/go-jose/go-jose/v4 v4.1.3
 	github.com/gorilla/websocket v1.5.3
 	github.com/joho/godotenv v1.5.1
 	github.com/spf13/cobra v1.10.2
 	github.com/streadway/amqp v1.1.0
 	github.com/tursodatabase/go-libsql v0.0.0-20260424063416-3051e37e6e04
+	golang.org/x/oauth2 v0.32.0
 )
 
 require (

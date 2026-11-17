@@ -172,12 +172,12 @@ Libraries: `github.com/coreos/go-oidc/v3` (discovery, ID-token verification) and
 - [x] `oidc_providers` + `user_identities` tables; optional password hash (SSO-only users store `''`, which password login refuses)
 - [ ] provider CRUD + test-discovery routes (admin)
 - [ ] start/callback handlers with state, nonce, PKCE, signed cookie
-- [ ] user matching/creation, domain allow-list, group → role mapping
+- [x] user matching/creation, domain allow-list, group → role mapping
 - [ ] UI: provider buttons on the login page; token pickup from the URL fragment
 - [ ] UI: admin providers page
 - [ ] setting to disable password login
 - [ ] CLI: `login --sso` (loopback), later `--device`
-- [ ] tests with a fake OIDC provider (`httptest` issuer + signed tokens)
+- [x] tests with a fake OIDC provider (`httptest` issuer + signed tokens)
 - [ ] docs: setup guides for Keycloak, Authentik, Zitadel, Google, Entra ID
 
 **Done when:** a user can sign in with Keycloak (or any OIDC provider) from the
