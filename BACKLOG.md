@@ -116,6 +116,12 @@ through one generic implementation:
 
 ### Design
 
+**Default stays as is.** Username/password login (and `AUTH_TOKEN`) remains the
+default and needs no setup. OIDC is off until an admin adds and enables a
+provider: with none enabled, `/auth/providers` returns an empty list, the login
+page shows only the password form, and the OIDC routes answer 404. Turning off
+password login is a separate, explicit admin choice.
+
 Libraries: `github.com/coreos/go-oidc/v3` (discovery, ID-token verification) and
 `golang.org/x/oauth2` (code exchange).
 
