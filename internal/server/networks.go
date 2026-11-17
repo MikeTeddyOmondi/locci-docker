@@ -9,7 +9,7 @@ import (
 )
 
 func (s *Server) listNetworks(c *gin.Context) {
-	list, err := s.Docker.ListNetworks(c.Request.Context())
+	list, err := dk(c).ListNetworks(c.Request.Context())
 	if err != nil {
 		s.fail(c, http.StatusInternalServerError, err)
 		return
@@ -24,7 +24,7 @@ func (s *Server) createNetwork(c *gin.Context) {
 		return
 	}
 
-	resp, err := s.Docker.CreateNetwork(c.Request.Context(), spec)
+	resp, err := dk(c).CreateNetwork(c.Request.Context(), spec)
 	if err != nil {
 		s.fail(c, statusFor(err), err)
 		return

@@ -9,8 +9,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/MikeTeddyOmondi/locci-docker/internal/config"
-	"github.com/MikeTeddyOmondi/locci-docker/internal/docker"
+	"github.com/MikeTeddyOmondi/locci-docker/internal/env"
 	"github.com/MikeTeddyOmondi/locci-docker/internal/jobs"
+	"github.com/MikeTeddyOmondi/locci-docker/internal/secret"
 	"github.com/MikeTeddyOmondi/locci-docker/internal/server"
 	"github.com/MikeTeddyOmondi/locci-docker/internal/store"
 )
@@ -38,7 +39,21 @@ func serveCmd() *cobra.Command {
 				log.Warn("no users yet and no AUTH_TOKEN: create one with `locci user add <name> --admin`")
 			}
 
-			dk, err := docker.New(cfg.DockerHost, cfg.TraefikDomain, log)
+			box, err := secret.New(cfg.SecretKey)
+			if err != nil {
+				return err
+			}
+			if box == nil {
+				log.Warn("LOCCI_SECRET_KEY is not set: remote (tcp+tls, ssh) environments can't be added or used")
+			}
+
+			// One Docker connection per environment, checked every 30s for the UI.
+			envs := &env.Registry{Store: db, Box: box, DockerHost: cfg.DockerHost, Domain: cfg.TraefikDomain, Log: log}
+			defer envs.Close()
+			go envs.Run(context.Background(), 30*time.Second)
+
+			// The deploy consumer uses the default environment.
+			dk, _, err := envs.Default()
 			if err != nil {
 				return err
 			}
@@ -60,7 +75,7 @@ func serveCmd() *cobra.Command {
 				}()
 			}
 
-			srv := &server.Server{Docker: dk, Store: db, AuthToken: cfg.AuthToken, Log: log}
+			srv := &server.Server{Envs: envs, Store: db, AuthToken: cfg.AuthToken, Log: log}
 			log.Info("listening", "port", cfg.ServerPort, "domain", cfg.TraefikDomain)
 			return srv.Router(cfg.GinMode).Run(":" + cfg.ServerPort)
 		},

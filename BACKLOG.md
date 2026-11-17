@@ -84,7 +84,7 @@ TLS keys and other secrets are encrypted at rest with AES-GCM using
 - [x] `internal/env` registry with lazy connect and health loop
 - [x] `docker.New` options for `tcp+tls` and `ssh` connections
 - [ ] environment CRUD + test routes (admin only)
-- [ ] env-scoped resource routes; default-env aliases for the current routes
+- [x] env-scoped resource routes; default-env aliases for the current routes
 - [ ] `environment` field on deploy jobs
 - [ ] UI: switcher, environments page, add/test dialog, env-aware routes
 - [ ] CLI: `env` commands, `--env` flag, saved default

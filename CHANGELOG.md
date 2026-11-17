@@ -83,6 +83,13 @@ that is an API server, a web UI and a CLI.
     pings every host concurrently, records `up`/`down` and `last_seen_at`,
     drops the client of a host that fails (the next request reconnects) and
     pins an SSH host key the first time one is seen.
+  - Every Docker route also exists under `/api/v1/environments/:env/...`
+    (containers, logs, stats, exec and the exec WebSocket, images, networks,
+    volumes, `system/info`, plus `/environments/:env/info`). Middleware picks
+    the environment's client for each request. The original routes, including
+    the four legacy container routes, keep their paths and payloads and use
+    the default environment; `/health` checks the default environment.
+    `locci serve` starts the registry and its 30s health loop.
 
 ### Changed
 

@@ -11,7 +11,7 @@ import (
 )
 
 func (s *Server) listContainers(c *gin.Context) {
-	list, err := s.Docker.ListContainers(c.Request.Context())
+	list, err := dk(c).ListContainers(c.Request.Context())
 	if err != nil {
 		s.fail(c, http.StatusInternalServerError, err)
 		return
@@ -26,7 +26,7 @@ func (s *Server) createContainer(c *gin.Context) {
 		return
 	}
 
-	created, err := s.Docker.CreateContainer(c.Request.Context(), spec)
+	created, err := dk(c).CreateContainer(c.Request.Context(), spec)
 	if err != nil {
 		s.fail(c, http.StatusInternalServerError, err)
 		return
@@ -35,7 +35,7 @@ func (s *Server) createContainer(c *gin.Context) {
 }
 
 func (s *Server) inspectContainer(c *gin.Context) {
-	info, err := s.Docker.InspectContainer(c.Request.Context(), c.Param("id"))
+	info, err := dk(c).InspectContainer(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		s.fail(c, statusFor(err), err)
 		return
@@ -47,7 +47,7 @@ func (s *Server) inspectContainer(c *gin.Context) {
 func (s *Server) containerAction(action string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
-		if err := s.Docker.ContainerAction(c.Request.Context(), id, action); err != nil {
+		if err := dk(c).ContainerAction(c.Request.Context(), id, action); err != nil {
 			s.fail(c, statusFor(err), err)
 			return
 		}
@@ -57,7 +57,7 @@ func (s *Server) containerAction(action string) gin.HandlerFunc {
 
 func (s *Server) removeContainer(c *gin.Context) {
 	id := c.Param("id")
-	if err := s.Docker.RemoveContainer(c.Request.Context(), id, c.Query("force") == "true"); err != nil {
+	if err := dk(c).RemoveContainer(c.Request.Context(), id, c.Query("force") == "true"); err != nil {
 		s.fail(c, statusFor(err), err)
 		return
 	}
@@ -66,7 +66,7 @@ func (s *Server) removeContainer(c *gin.Context) {
 
 // containerLogs streams plain text. ?follow=true keeps the connection open.
 func (s *Server) containerLogs(c *gin.Context) {
-	rc, err := s.Docker.Logs(c.Request.Context(), c.Param("id"),
+	rc, err := dk(c).Logs(c.Request.Context(), c.Param("id"),
 		c.Query("follow") == "true", c.DefaultQuery("tail", "200"))
 	if err != nil {
 		s.fail(c, statusFor(err), err)
@@ -97,7 +97,7 @@ func (s *Server) containerLogs(c *gin.Context) {
 }
 
 func (s *Server) containerStats(c *gin.Context) {
-	st, err := s.Docker.Stats(c.Request.Context(), c.Param("id"))
+	st, err := dk(c).Stats(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		s.fail(c, statusFor(err), err)
 		return
@@ -113,7 +113,7 @@ func (s *Server) containerExec(c *gin.Context) {
 		s.fail(c, http.StatusBadRequest, err)
 		return
 	}
-	res, err := s.Docker.Exec(c.Request.Context(), c.Param("id"), req.Cmd)
+	res, err := dk(c).Exec(c.Request.Context(), c.Param("id"), req.Cmd)
 	if err != nil {
 		s.fail(c, statusFor(err), err)
 		return
@@ -131,7 +131,7 @@ func (s *Server) startContainerLegacy(c *gin.Context) {
 		s.fail(c, http.StatusBadRequest, err)
 		return
 	}
-	if err := s.Docker.StartContainer(c.Request.Context(), req.ContainerID); err != nil {
+	if err := dk(c).StartContainer(c.Request.Context(), req.ContainerID); err != nil {
 		s.fail(c, statusFor(err), err)
 		return
 	}
@@ -147,7 +147,7 @@ func (s *Server) deleteContainerLegacy(c *gin.Context) {
 		s.fail(c, http.StatusBadRequest, err)
 		return
 	}
-	if err := s.Docker.RemoveContainer(c.Request.Context(), req.ContainerID, req.Force); err != nil {
+	if err := dk(c).RemoveContainer(c.Request.Context(), req.ContainerID, req.Force); err != nil {
 		s.fail(c, statusFor(err), err)
 		return
 	}

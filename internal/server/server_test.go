@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/MikeTeddyOmondi/locci-docker/internal/docker"
+	"github.com/MikeTeddyOmondi/locci-docker/internal/env"
 	"github.com/MikeTeddyOmondi/locci-docker/internal/store"
 )
 
@@ -23,12 +23,14 @@ func newTestServer(t *testing.T) (*httptest.Server, *store.Store) {
 	t.Cleanup(func() { db.Close() })
 
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	dk, err := docker.New("tcp://127.0.0.1:1", "example.test", log) // nothing listens here
-	if err != nil {
+	// The default environment points where nothing listens: "Docker down".
+	if _, err := db.CreateEnvironment(store.Environment{Name: "local", Kind: store.KindLocal, URL: "tcp://127.0.0.1:1"}); err != nil {
 		t.Fatal(err)
 	}
+	envs := &env.Registry{Store: db, Domain: "example.test", Log: log}
+	t.Cleanup(envs.Close)
 
-	s := &Server{Docker: dk, Store: db, AuthToken: "static", Log: log}
+	s := &Server{Envs: envs, Store: db, AuthToken: "static", Log: log}
 	ts := httptest.NewServer(s.Router("test"))
 	t.Cleanup(ts.Close)
 	return ts, db

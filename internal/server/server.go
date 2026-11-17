@@ -11,12 +11,13 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/MikeTeddyOmondi/locci-docker/internal/docker"
+	"github.com/MikeTeddyOmondi/locci-docker/internal/env"
 	"github.com/MikeTeddyOmondi/locci-docker/internal/store"
 	"github.com/MikeTeddyOmondi/locci-docker/internal/ui"
 )
 
 type Server struct {
-	Docker    *docker.Service
+	Envs      *env.Registry // one Docker connection per environment
 	Store     *store.Store
 	AuthToken string // optional static admin token (AUTH_TOKEN)
 	Log       *slog.Logger
@@ -35,39 +36,18 @@ func (s *Server) Router(mode string) *gin.Engine {
 
 	api.GET("/auth/me", s.me)
 	api.POST("/auth/logout", s.logout)
-	api.GET("/system/info", s.systemInfo)
 
-	// Containers. The first four routes are the original v1 API, unchanged.
-	api.GET("/containers", s.listContainers)
-	api.POST("/containers", s.createContainer)
-	api.POST("/containers/start", s.startContainerLegacy)
-	api.DELETE("/containers", s.deleteContainerLegacy)
-	api.GET("/containers/:id", s.inspectContainer)
-	api.DELETE("/containers/:id", s.removeContainer)
-	for _, action := range docker.Actions {
-		api.POST("/containers/:id/"+action, s.containerAction(action))
-	}
-	api.GET("/containers/:id/logs", s.containerLogs)
-	api.GET("/containers/:id/stats", s.containerStats)
-	api.POST("/containers/:id/exec", s.containerExec)
-	api.GET("/containers/:id/exec/ws", s.execWS)
+	// Docker resources on the default environment. The four legacy container
+	// routes and GET/POST /networks are the original v1 API, unchanged.
+	def := api.Group("", s.useEnv)
+	def.POST("/containers/start", s.startContainerLegacy)
+	def.DELETE("/containers", s.deleteContainerLegacy)
+	s.resourceRoutes(def)
 
-	// Images
-	api.GET("/images", s.listImages)
-	api.POST("/images/pull", s.pullImage)
-	api.POST("/images/prune", s.pruneImages)
-	api.DELETE("/images/:id", s.removeImage)
-
-	// Networks (first two are original v1)
-	api.GET("/networks", s.listNetworks)
-	api.POST("/networks", s.createNetwork)
-	api.GET("/networks/:id", s.inspectNetwork)
-	api.DELETE("/networks/:id", s.removeNetwork)
-
-	// Volumes
-	api.GET("/volumes", s.listVolumes)
-	api.POST("/volumes", s.createVolume)
-	api.DELETE("/volumes/:name", s.removeVolume)
+	// The same routes for a chosen environment: /api/v1/environments/:env/...
+	scoped := api.Group("/environments/:env", s.useEnv)
+	scoped.GET("/info", s.systemInfo)
+	s.resourceRoutes(scoped)
 
 	// Admin
 	admin := api.Group("", adminOnly)
@@ -89,6 +69,41 @@ func (s *Server) Router(mode string) *gin.Engine {
 	return r
 }
 
+// resourceRoutes registers every Docker resource route on g, which must run useEnv.
+func (s *Server) resourceRoutes(g *gin.RouterGroup) {
+	g.GET("/system/info", s.systemInfo)
+
+	// Containers
+	g.GET("/containers", s.listContainers)
+	g.POST("/containers", s.createContainer)
+	g.GET("/containers/:id", s.inspectContainer)
+	g.DELETE("/containers/:id", s.removeContainer)
+	for _, action := range docker.Actions {
+		g.POST("/containers/:id/"+action, s.containerAction(action))
+	}
+	g.GET("/containers/:id/logs", s.containerLogs)
+	g.GET("/containers/:id/stats", s.containerStats)
+	g.POST("/containers/:id/exec", s.containerExec)
+	g.GET("/containers/:id/exec/ws", s.execWS)
+
+	// Images
+	g.GET("/images", s.listImages)
+	g.POST("/images/pull", s.pullImage)
+	g.POST("/images/prune", s.pruneImages)
+	g.DELETE("/images/:id", s.removeImage)
+
+	// Networks
+	g.GET("/networks", s.listNetworks)
+	g.POST("/networks", s.createNetwork)
+	g.GET("/networks/:id", s.inspectNetwork)
+	g.DELETE("/networks/:id", s.removeNetwork)
+
+	// Volumes
+	g.GET("/volumes", s.listVolumes)
+	g.POST("/volumes", s.createVolume)
+	g.DELETE("/volumes/:name", s.removeVolume)
+}
+
 // logRequests logs method, path (never the query, which may hold a token) and status.
 func (s *Server) logRequests(c *gin.Context) {
 	start := time.Now()
@@ -97,8 +112,13 @@ func (s *Server) logRequests(c *gin.Context) {
 		"status", c.Writer.Status(), "ms", time.Since(start).Milliseconds())
 }
 
+// health reports whether the default environment's Docker is reachable.
 func (s *Server) health(c *gin.Context) {
-	if err := s.Docker.Ping(c.Request.Context()); err != nil {
+	svc, _, err := s.Envs.Default()
+	if err == nil {
+		err = svc.Ping(c.Request.Context())
+	}
+	if err != nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"status": "unhealthy", "error": err.Error()})
 		return
 	}

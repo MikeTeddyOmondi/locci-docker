@@ -35,7 +35,7 @@ func (s *Server) execWS(c *gin.Context) {
 	}
 	defer ws.Close()
 
-	execID, hr, err := s.Docker.ExecTTY(c.Request.Context(), c.Param("id"), cmd)
+	execID, hr, err := dk(c).ExecTTY(c.Request.Context(), c.Param("id"), cmd)
 	if err != nil {
 		ws.WriteMessage(websocket.CloseMessage,
 			websocket.FormatCloseMessage(websocket.CloseInternalServerErr, err.Error()))
@@ -72,7 +72,7 @@ func (s *Server) execWS(c *gin.Context) {
 				Resize []uint `json:"resize"`
 			}
 			if json.Unmarshal(data, &msg) == nil && len(msg.Resize) == 2 {
-				_ = s.Docker.ResizeExec(c.Request.Context(), execID, msg.Resize[0], msg.Resize[1])
+				_ = dk(c).ResizeExec(c.Request.Context(), execID, msg.Resize[0], msg.Resize[1])
 				continue
 			}
 		}

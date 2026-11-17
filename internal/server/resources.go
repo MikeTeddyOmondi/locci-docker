@@ -11,7 +11,7 @@ import (
 // ---- images ----
 
 func (s *Server) listImages(c *gin.Context) {
-	list, err := s.Docker.ListImages(c.Request.Context())
+	list, err := dk(c).ListImages(c.Request.Context())
 	if err != nil {
 		s.fail(c, http.StatusInternalServerError, err)
 		return
@@ -27,7 +27,7 @@ func (s *Server) pullImage(c *gin.Context) {
 		s.fail(c, http.StatusBadRequest, err)
 		return
 	}
-	if err := s.Docker.Pull(c.Request.Context(), req.Image); err != nil {
+	if err := dk(c).Pull(c.Request.Context(), req.Image); err != nil {
 		s.fail(c, http.StatusBadGateway, err)
 		return
 	}
@@ -35,7 +35,7 @@ func (s *Server) pullImage(c *gin.Context) {
 }
 
 func (s *Server) removeImage(c *gin.Context) {
-	resp, err := s.Docker.RemoveImage(c.Request.Context(), c.Param("id"), c.Query("force") == "true")
+	resp, err := dk(c).RemoveImage(c.Request.Context(), c.Param("id"), c.Query("force") == "true")
 	if err != nil {
 		s.fail(c, statusFor(err), err)
 		return
@@ -44,7 +44,7 @@ func (s *Server) removeImage(c *gin.Context) {
 }
 
 func (s *Server) pruneImages(c *gin.Context) {
-	report, err := s.Docker.PruneImages(c.Request.Context())
+	report, err := dk(c).PruneImages(c.Request.Context())
 	if err != nil {
 		s.fail(c, http.StatusInternalServerError, err)
 		return
@@ -55,7 +55,7 @@ func (s *Server) pruneImages(c *gin.Context) {
 // ---- networks ----
 
 func (s *Server) inspectNetwork(c *gin.Context) {
-	n, err := s.Docker.InspectNetwork(c.Request.Context(), c.Param("id"))
+	n, err := dk(c).InspectNetwork(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		s.fail(c, statusFor(err), err)
 		return
@@ -64,7 +64,7 @@ func (s *Server) inspectNetwork(c *gin.Context) {
 }
 
 func (s *Server) removeNetwork(c *gin.Context) {
-	if err := s.Docker.RemoveNetwork(c.Request.Context(), c.Param("id")); err != nil {
+	if err := dk(c).RemoveNetwork(c.Request.Context(), c.Param("id")); err != nil {
 		s.fail(c, statusFor(err), err)
 		return
 	}
@@ -74,7 +74,7 @@ func (s *Server) removeNetwork(c *gin.Context) {
 // ---- volumes ----
 
 func (s *Server) listVolumes(c *gin.Context) {
-	list, err := s.Docker.ListVolumes(c.Request.Context())
+	list, err := dk(c).ListVolumes(c.Request.Context())
 	if err != nil {
 		s.fail(c, http.StatusInternalServerError, err)
 		return
@@ -88,7 +88,7 @@ func (s *Server) createVolume(c *gin.Context) {
 		s.fail(c, http.StatusBadRequest, err)
 		return
 	}
-	v, err := s.Docker.CreateVolume(c.Request.Context(), spec)
+	v, err := dk(c).CreateVolume(c.Request.Context(), spec)
 	if err != nil {
 		s.fail(c, http.StatusInternalServerError, err)
 		return
@@ -97,7 +97,7 @@ func (s *Server) createVolume(c *gin.Context) {
 }
 
 func (s *Server) removeVolume(c *gin.Context) {
-	if err := s.Docker.RemoveVolume(c.Request.Context(), c.Param("name"), c.Query("force") == "true"); err != nil {
+	if err := dk(c).RemoveVolume(c.Request.Context(), c.Param("name"), c.Query("force") == "true"); err != nil {
 		s.fail(c, statusFor(err), err)
 		return
 	}
@@ -107,7 +107,7 @@ func (s *Server) removeVolume(c *gin.Context) {
 // ---- system ----
 
 func (s *Server) systemInfo(c *gin.Context) {
-	info, err := s.Docker.Info(c.Request.Context())
+	info, err := dk(c).Info(c.Request.Context())
 	if err != nil {
 		s.fail(c, http.StatusInternalServerError, err)
 		return
