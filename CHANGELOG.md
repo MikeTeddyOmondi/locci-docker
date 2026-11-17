@@ -179,6 +179,10 @@ that is an API server, a web UI and a CLI.
     removed while it is off. `LOCCI_PUBLIC_URL` fixes the base URL used in
     redirect URIs; otherwise it comes from the request (`X-Forwarded-*`
     aware).
+  - CLI: `locci login --sso <provider>` listens on 127.0.0.1, opens the
+    browser (printing the URL too) and saves the token the server sends back.
+    `locci auth password-login on|off` writes the setting straight to the
+    database on the server host, as break-glass access when SSO is broken.
 
 ### Changed
 

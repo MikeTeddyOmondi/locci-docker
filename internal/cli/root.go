@@ -35,7 +35,7 @@ func newRoot() *cobra.Command {
 		&cobra.Group{ID: "client", Title: "Client:"},
 	)
 
-	for _, c := range []*cobra.Command{serveCmd(), userCmd()} {
+	for _, c := range []*cobra.Command{serveCmd(), userCmd(), authCmd()} {
 		c.GroupID = "server"
 		root.AddCommand(c)
 	}

@@ -12,16 +12,25 @@ import (
 )
 
 func loginCmd() *cobra.Command {
-	var url, username, token string
+	var url, username, token, ssoProvider string
 	cmd := &cobra.Command{
 		Use:   "login",
 		Short: "Log in to a locci server and save the token",
 		Example: `  locci login --url https://locci.example.com -u mike
+  locci login --url https://locci.example.com --sso keycloak
   locci login --url http://localhost:8998 --token $AUTH_TOKEN`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg := client.LoadConfig()
 			if url != "" {
 				cfg.URL = url
+			}
+
+			if token == "" && ssoProvider != "" {
+				t, err := ssoLogin(cfg, ssoProvider)
+				if err != nil {
+					return err
+				}
+				token = t
 			}
 
 			if token == "" {
@@ -58,6 +67,7 @@ func loginCmd() *cobra.Command {
 	cmd.Flags().StringVar(&url, "url", "", "server URL (default http://localhost:8998)")
 	cmd.Flags().StringVarP(&username, "username", "u", "", "username")
 	cmd.Flags().StringVar(&token, "token", "", "use an existing API token or AUTH_TOKEN instead of a password")
+	cmd.Flags().StringVar(&ssoProvider, "sso", "", "sign in through this identity provider in your browser (see the login page for names)")
 	return cmd
 }
 
