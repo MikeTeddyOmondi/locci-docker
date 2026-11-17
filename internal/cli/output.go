@@ -13,7 +13,7 @@ import (
 // outputJSON is set by the global -o/--output flag.
 var outputJSON bool
 
-// envFlag is the global -E/--env flag; it beats LOCCI_ENV and the saved choice.
+// envFlag is the global -E/--environment flag; it beats LOCCI_ENV and the saved choice.
 var envFlag string
 
 func api() *client.Client {
