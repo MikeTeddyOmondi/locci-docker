@@ -1,4 +1,5 @@
-// Package store keeps users, API tokens, Docker environments and the audit log in libsql.
+// Package store keeps users, API tokens, Docker environments, OIDC providers
+// and the audit log in libsql.
 //
 // DATABASE_URL can be a local file ("file:locci.db") or a remote
 // libsql/Turso URL ("libsql://<db>.turso.io?authToken=...").
@@ -20,11 +21,15 @@ import (
 var ErrNotFound = errors.New("not found")
 
 type User struct {
-	ID       int64  `json:"id"`
-	Username string `json:"username"`
-	Role     string `json:"role"` // "admin" or "user"
-	Created  string `json:"created_at"`
+	ID          int64  `json:"id"`
+	Username    string `json:"username"`
+	Role        string `json:"role"` // "admin" or "user"
+	Created     string `json:"created_at"`
+	HasPassword bool   `json:"has_password"` // false for SSO-only users
 }
+
+// userColumns selects a User from the users table aliased as u.
+const userColumns = `u.id, u.username, u.role, u.created_at, u.password_hash != ''`
 
 func (u User) IsAdmin() bool { return u.Role == "admin" }
 
@@ -84,6 +89,37 @@ var schema = []string{
 	// At most one default environment.
 	`CREATE UNIQUE INDEX IF NOT EXISTS environments_one_default
 		ON environments (is_default) WHERE is_default = 1`,
+	// OIDC sign-in. client_secret is encrypted like environment secrets.
+	`CREATE TABLE IF NOT EXISTS oidc_providers (
+		id                INTEGER PRIMARY KEY,
+		slug              TEXT NOT NULL UNIQUE,
+		display_name      TEXT NOT NULL,
+		issuer_url        TEXT NOT NULL,
+		client_id         TEXT NOT NULL,
+		client_secret     TEXT NOT NULL DEFAULT '',
+		scopes            TEXT NOT NULL DEFAULT 'openid email profile',
+		enabled           INTEGER NOT NULL DEFAULT 0,
+		auto_create_users INTEGER NOT NULL DEFAULT 0,
+		default_role      TEXT NOT NULL DEFAULT 'user',
+		admin_group       TEXT NOT NULL DEFAULT '',
+		groups_claim      TEXT NOT NULL DEFAULT 'groups',
+		allowed_domains   TEXT NOT NULL DEFAULT '',
+		created_at        TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+	)`,
+	// Links a provider's subject to a user. One user can have several.
+	`CREATE TABLE IF NOT EXISTS user_identities (
+		id          INTEGER PRIMARY KEY,
+		provider_id INTEGER NOT NULL REFERENCES oidc_providers(id),
+		subject     TEXT NOT NULL,
+		user_id     INTEGER NOT NULL REFERENCES users(id),
+		email       TEXT NOT NULL DEFAULT '',
+		created_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE (provider_id, subject)
+	)`,
+	`CREATE TABLE IF NOT EXISTS settings (
+		key   TEXT PRIMARY KEY,
+		value TEXT NOT NULL
+	)`,
 }
 
 // Open connects and creates the tables if needed.
@@ -130,13 +166,38 @@ func (s *Store) CreateUser(username, password, role string) (User, error) {
 	return s.UserByName(username)
 }
 
+// CreateSSOUser creates a user without a password: password_hash stays ''
+// (the column is NOT NULL and SQLite can't relax that in place), and
+// CheckPassword refuses an empty hash, so the account signs in only through
+// its identity provider until someone sets a password.
+func (s *Store) CreateSSOUser(username, role string) (User, error) {
+	if username == "" {
+		return User{}, errors.New("username required")
+	}
+	if role != "admin" {
+		role = "user"
+	}
+	if _, err := s.DB.Exec(`INSERT INTO users (username, password_hash, role) VALUES (?, '', ?)`, username, role); err != nil {
+		return User{}, err
+	}
+	return s.UserByName(username)
+}
+
+// SetRole changes a user's role ("admin" or "user").
+func (s *Store) SetRole(id int64, role string) error {
+	if role != "admin" {
+		role = "user"
+	}
+	_, err := s.DB.Exec(`UPDATE users SET role = ? WHERE id = ?`, role, id)
+	return err
+}
+
 func (s *Store) UserByName(username string) (User, error) {
-	return s.scanUser(s.DB.QueryRow(
-		`SELECT id, username, role, created_at FROM users WHERE username = ?`, username))
+	return s.scanUser(s.DB.QueryRow(`SELECT `+userColumns+` FROM users u WHERE u.username = ?`, username))
 }
 
 func (s *Store) ListUsers() ([]User, error) {
-	rows, err := s.DB.Query(`SELECT id, username, role, created_at FROM users ORDER BY username`)
+	rows, err := s.DB.Query(`SELECT ` + userColumns + ` FROM users u ORDER BY u.username`)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +206,7 @@ func (s *Store) ListUsers() ([]User, error) {
 	users := []User{}
 	for rows.Next() {
 		var u User
-		if err := rows.Scan(&u.ID, &u.Username, &u.Role, &u.Created); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.Role, &u.Created, &u.HasPassword); err != nil {
 			return nil, err
 		}
 		users = append(users, u)
@@ -159,6 +220,9 @@ func (s *Store) DeleteUser(username string) error {
 		return err
 	}
 	if _, err := s.DB.Exec(`DELETE FROM tokens WHERE user_id = ?`, u.ID); err != nil {
+		return err
+	}
+	if _, err := s.DB.Exec(`DELETE FROM user_identities WHERE user_id = ?`, u.ID); err != nil {
 		return err
 	}
 	_, err = s.DB.Exec(`DELETE FROM users WHERE id = ?`, u.ID)
@@ -187,7 +251,7 @@ func (s *Store) SetPassword(username, password string) error {
 func (s *Store) CheckPassword(username, password string) (User, error) {
 	var hash string
 	err := s.DB.QueryRow(`SELECT password_hash FROM users WHERE username = ?`, username).Scan(&hash)
-	if err != nil {
+	if err != nil || hash == "" { // "" = SSO-only user: no password to match
 		return User{}, ErrNotFound
 	}
 	if bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) != nil {
@@ -198,7 +262,7 @@ func (s *Store) CheckPassword(username, password string) (User, error) {
 
 func (s *Store) scanUser(row *sql.Row) (User, error) {
 	var u User
-	err := row.Scan(&u.ID, &u.Username, &u.Role, &u.Created)
+	err := row.Scan(&u.ID, &u.Username, &u.Role, &u.Created, &u.HasPassword)
 	if errors.Is(err, sql.ErrNoRows) {
 		return User{}, ErrNotFound
 	}
@@ -220,8 +284,7 @@ func (s *Store) NewToken(userID int64, name string) (string, error) {
 }
 
 func (s *Store) UserByToken(token string) (User, error) {
-	return s.scanUser(s.DB.QueryRow(`
-		SELECT u.id, u.username, u.role, u.created_at
+	return s.scanUser(s.DB.QueryRow(`SELECT `+userColumns+`
 		FROM tokens t JOIN users u ON u.id = t.user_id
 		WHERE t.token_hash = ?`, hashToken(token)))
 }

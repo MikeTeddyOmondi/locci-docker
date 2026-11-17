@@ -147,6 +147,14 @@ that is an API server, a web UI and a CLI.
     SSH host's pinned key can be forgotten (it is dropped automatically when
     the URL changes).
 
+- **Single sign-on with OIDC (in progress).**
+  - Tables `oidc_providers` (client secret encrypted like environment keys),
+    `user_identities` (provider subject to user, unique per provider) and
+    `settings`. SSO-only users keep `password_hash = ''` because SQLite can't
+    drop the `NOT NULL` in place; password login refuses an empty hash, and
+    `locci user passwd` can give such a user a password later. Users report
+    `has_password`. Password login stays on by default.
+
 ### Changed
 
 - Code split from `cmd/main.go` into internal packages: `cli`, `client`,

@@ -169,7 +169,7 @@ Libraries: `github.com/coreos/go-oidc/v3` (discovery, ID-token verification) and
 
 ### Tasks
 
-- [ ] `oidc_providers` + `user_identities` tables; optional password hash
+- [x] `oidc_providers` + `user_identities` tables; optional password hash (SSO-only users store `''`, which password login refuses)
 - [ ] provider CRUD + test-discovery routes (admin)
 - [ ] start/callback handlers with state, nonce, PKCE, signed cookie
 - [ ] user matching/creation, domain allow-list, group → role mapping
