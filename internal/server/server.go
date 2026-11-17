@@ -4,6 +4,7 @@ package server
 import (
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	cerrdefs "github.com/containerd/errdefs"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/MikeTeddyOmondi/locci-docker/internal/docker"
 	"github.com/MikeTeddyOmondi/locci-docker/internal/store"
+	"github.com/MikeTeddyOmondi/locci-docker/internal/ui"
 )
 
 type Server struct {
@@ -73,6 +75,16 @@ func (s *Server) Router(mode string) *gin.Engine {
 	admin.POST("/users", s.createUser)
 	admin.DELETE("/users/:name", s.deleteUser)
 	admin.GET("/audit", s.listAudit)
+
+	// Everything else is the embedded web UI (unknown /api paths stay JSON 404s).
+	webUI := ui.Handler()
+	r.NoRoute(func(c *gin.Context) {
+		if strings.HasPrefix(c.Request.URL.Path, "/api/") {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+			return
+		}
+		webUI.ServeHTTP(c.Writer, c.Request)
+	})
 
 	return r
 }
