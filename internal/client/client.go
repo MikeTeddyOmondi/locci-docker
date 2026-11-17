@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,6 +19,7 @@ import (
 type Config struct {
 	URL   string `json:"url"`
 	Token string `json:"token"`
+	Env   string `json:"env,omitempty"` // environment chosen with `locci env use`; empty = server default
 }
 
 func configPath() (string, error) {
@@ -28,19 +30,29 @@ func configPath() (string, error) {
 	return filepath.Join(dir, "locci", "config.json"), nil
 }
 
-// LoadConfig reads the saved config. LOCCI_URL and LOCCI_TOKEN override it.
-func LoadConfig() Config {
+// LoadSavedConfig reads only the config file, without environment overrides.
+// Use it before SaveConfig so overrides aren't written to disk.
+func LoadSavedConfig() Config {
 	var c Config
 	if p, err := configPath(); err == nil {
 		if b, err := os.ReadFile(p); err == nil {
 			_ = json.Unmarshal(b, &c)
 		}
 	}
+	return c
+}
+
+// LoadConfig reads the saved config. LOCCI_URL, LOCCI_TOKEN and LOCCI_ENV override it.
+func LoadConfig() Config {
+	c := LoadSavedConfig()
 	if v := os.Getenv("LOCCI_URL"); v != "" {
 		c.URL = v
 	}
 	if v := os.Getenv("LOCCI_TOKEN"); v != "" {
 		c.Token = v
+	}
+	if v := os.Getenv("LOCCI_ENV"); v != "" {
+		c.Env = v
 	}
 	if c.URL == "" {
 		c.URL = "http://localhost:8998"
@@ -63,11 +75,36 @@ func SaveConfig(c Config) error {
 type Client struct {
 	URL   string
 	Token string
+	Env   string // when set, Docker resource paths go to /environments/<Env>/...
 	HTTP  *http.Client
 }
 
 func New(c Config) *Client {
-	return &Client{URL: strings.TrimRight(c.URL, "/"), Token: c.Token, HTTP: &http.Client{Timeout: 10 * time.Minute}}
+	return &Client{URL: strings.TrimRight(c.URL, "/"), Token: c.Token, Env: c.Env, HTTP: &http.Client{Timeout: 10 * time.Minute}}
+}
+
+// envScoped are the API paths that belong to a Docker environment.
+var envScoped = []string{"containers", "images", "networks", "volumes", "system"}
+
+// Scope rewrites /api/v1/<resource>... to /api/v1/environments/<env>/<resource>...
+// when an environment is chosen, so every command works against any host
+// without knowing about environments. Other paths are left alone.
+func (c *Client) Scope(path string) string {
+	if c.Env == "" {
+		return path
+	}
+	rest, ok := strings.CutPrefix(path, "/api/v1/")
+	if !ok {
+		return path
+	}
+	head, _, _ := strings.Cut(rest, "/")
+	head, _, _ = strings.Cut(head, "?")
+	for _, r := range envScoped {
+		if head == r {
+			return "/api/v1/environments/" + url.PathEscape(c.Env) + "/" + rest
+		}
+	}
+	return path
 }
 
 // Do sends a JSON request and decodes the JSON response into out (if not nil).
@@ -109,7 +146,7 @@ func (c *Client) send(method, path string, body any) (*http.Response, error) {
 		r = bytes.NewReader(b)
 	}
 
-	req, err := http.NewRequest(method, c.URL+path, r)
+	req, err := http.NewRequest(method, c.URL+c.Scope(path), r)
 	if err != nil {
 		return nil, err
 	}

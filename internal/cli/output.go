@@ -13,7 +13,16 @@ import (
 // outputJSON is set by the global -o/--output flag.
 var outputJSON bool
 
-func api() *client.Client { return client.New(client.LoadConfig()) }
+// envFlag is the global -E/--env flag; it beats LOCCI_ENV and the saved choice.
+var envFlag string
+
+func api() *client.Client {
+	cfg := client.LoadConfig()
+	if envFlag != "" {
+		cfg.Env = envFlag
+	}
+	return client.New(cfg)
+}
 
 // printJSON pretty-prints any JSON value.
 func printJSON(v any) error {

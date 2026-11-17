@@ -110,6 +110,13 @@ that is an API server, a web UI and a CLI.
     to deploy to; without it they use the current default, as before. The
     existing `environment` field is untouched, since senders already use it
     for their own stage names.
+  - CLI: `locci env ls|add|rm|test|use|default`. `env add` tests the
+    connection first (refusing an unreachable host unless `--no-test`), shows
+    the Docker version and SSH fingerprint, and pins exactly that key. Every
+    command takes `-E/--env`, then `LOCCI_ENV`, then the choice saved by
+    `locci env use` (`--clear` follows the server default again). The client
+    rewrites Docker resource paths to `/environments/<env>/...`, so existing
+    commands work against any host unchanged.
 
 ### Changed
 

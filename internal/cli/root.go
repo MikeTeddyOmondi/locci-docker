@@ -19,6 +19,7 @@ func Execute() {
 
 	var output string
 	root.PersistentFlags().StringVarP(&output, "output", "o", "table", "output format: table or json")
+	root.PersistentFlags().StringVarP(&envFlag, "env", "E", "", "environment (Docker host) to use; default: LOCCI_ENV, then `locci env use`, then the server default")
 	root.PersistentPreRun = func(cmd *cobra.Command, args []string) { outputJSON = output == "json" }
 
 	root.AddGroup(
@@ -32,7 +33,7 @@ func Execute() {
 	}
 
 	client := []*cobra.Command{
-		loginCmd(), logoutCmd(), whoamiCmd(),
+		loginCmd(), logoutCmd(), whoamiCmd(), envCmd(),
 		psCmd(), runCmd(), rmCmd(), logsCmd(), inspectCmd(), statsCmd(), execCmd(),
 		imageCmd(), networkCmd(), volumeCmd(), infoCmd(), auditCmd(),
 	}
