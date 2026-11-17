@@ -53,7 +53,7 @@
 		<a href="/" class="flex items-center gap-2.5">
 			<Logo class="size-8" />
 			<span class="font-heading text-xl font-bold tracking-tight">locci</span>
-			<span class="kicker rounded border px-1.5 py-0.5 text-[0.6rem]">dock</span>
+			<span class="kicker rounded border px-1.5 py-0.5 text-[0.6rem]">docker</span>
 		</a>
 		<ThemeToggle />
 	</div>
