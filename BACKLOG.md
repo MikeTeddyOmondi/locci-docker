@@ -81,7 +81,7 @@ TLS keys and other secrets are encrypted at rest with AES-GCM using
 
 - [x] `environments` table + store methods; seed a `local` default on first start
 - [x] secret encryption helper (`LOCCI_SECRET_KEY`), used for TLS keys
-- [ ] `internal/env` registry with lazy connect and health loop
+- [x] `internal/env` registry with lazy connect and health loop
 - [x] `docker.New` options for `tcp+tls` and `ssh` connections
 - [ ] environment CRUD + test routes (admin only)
 - [ ] env-scoped resource routes; default-env aliases for the current routes

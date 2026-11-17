@@ -77,6 +77,12 @@ that is an API server, a web UI and a CLI.
     the URL such as `ssh://me@host/run/user/1000/docker.sock` for rootless
     Docker), pins the host key on first connect and refuses a changed key, and
     redials a dropped connection. Keys must be unencrypted (deploy keys).
+  - `internal/env` registry: one cached `docker.Service` per environment,
+    connected on first use. A cached client remembers a hash of the settings it
+    was built from, so editing a host rebuilds it automatically. A health loop
+    pings every host concurrently, records `up`/`down` and `last_seen_at`,
+    drops the client of a host that fails (the next request reconnects) and
+    pins an SSH host key the first time one is seen.
 
 ### Changed
 
