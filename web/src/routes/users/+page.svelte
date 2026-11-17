@@ -113,6 +113,7 @@
 	{/snippet}
 	{#snippet youBadge(u)}
 		{#if isMe(u)}<Badge variant="outline" class="text-[0.65rem]">you</Badge>{/if}
+		{#if !u.has_password}<Badge variant="secondary" class="text-[0.65rem]" title="Signs in through single sign-on only">SSO</Badge>{/if}
 	{/snippet}
 	{#snippet deleteBtn(u)}
 		{#if !isMe(u)}

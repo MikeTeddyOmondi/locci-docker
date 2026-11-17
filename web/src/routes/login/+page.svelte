@@ -1,6 +1,8 @@
 <script>
 	import { goto } from '$app/navigation';
-	import { Button } from '$lib/components/ui/button/index.js';
+	import { Button, buttonVariants } from '$lib/components/ui/button/index.js';
+	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
+	import KeyRoundIcon from '@lucide/svelte/icons/key-round';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
@@ -15,6 +17,28 @@
 	let password = $state('');
 	let error = $state('');
 	let busy = $state(false);
+
+	// What the server offers: providers is empty unless an admin enabled SSO.
+	let methods = $state(null); // { password_login, providers: [{slug, display_name}] }
+
+	$effect(() => {
+		// Back from single sign-on: the token (or an error) is in the fragment,
+		// which browsers never send to servers. Take it and clean the URL.
+		const back = new URLSearchParams(location.hash.slice(1));
+		if (back.has('token') || back.has('error')) {
+			history.replaceState(null, '', location.pathname);
+			if (back.get('token')) {
+				auth.token = back.get('token');
+				session.user = null; // the layout loads it
+				goto('/');
+				return;
+			}
+			error = back.get('error');
+		}
+		api('GET', '/auth/providers')
+			.then((m) => (methods = m))
+			.catch(() => (methods = { password_login: true, providers: [] }));
+	});
 
 	async function login(e) {
 		e.preventDefault();
@@ -53,7 +77,7 @@
 		</div>
 
 		<div class="flex flex-1 items-center justify-center py-10">
-			<form class="rise w-full max-w-sm space-y-6" onsubmit={login}>
+			<div class="rise w-full max-w-sm space-y-6">
 				<div>
 					<div class="kicker mb-2 flex items-center gap-2">
 						<span class="inline-block h-px w-5 bg-primary"></span>Gate 01
@@ -64,23 +88,65 @@
 					</p>
 				</div>
 
-				<div class="space-y-4">
-					<div class="space-y-2">
-						<Label for="username">Username</Label>
-						<Input id="username" bind:value={username} autocomplete="username" required class="h-11" />
+				{#if !methods}
+					<div class="space-y-3" aria-busy="true">
+						<Skeleton class="h-11 w-full" /><Skeleton class="h-11 w-full" />
 					</div>
-					<div class="space-y-2">
-						<Label for="password">Password</Label>
-						<Input
-							id="password"
-							type="password"
-							bind:value={password}
-							autocomplete="current-password"
-							required
-							class="h-11"
-						/>
-					</div>
-				</div>
+				{:else}
+					{#if methods.providers.length}
+						<div class="space-y-2">
+							{#each methods.providers as p (p.slug)}
+								<a
+									href="/api/v1/auth/oidc/{encodeURIComponent(p.slug)}/start"
+									data-sveltekit-reload
+									class="{buttonVariants({ variant: 'outline' })} group h-11 w-full justify-start gap-3 text-base"
+								>
+									<span class="ribbed grid size-7 place-items-center rounded-md bg-primary/15 text-primary"><KeyRoundIcon class="size-4" /></span>
+									Continue with {p.display_name}
+									<ArrowRightIcon class="ml-auto text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+								</a>
+							{/each}
+						</div>
+					{/if}
+
+					{#if methods.providers.length && methods.password_login}
+						<div class="flex items-center gap-3">
+							<span class="h-px flex-1 bg-border"></span>
+							<span class="kicker text-[0.6rem]">or with a password</span>
+							<span class="h-px flex-1 bg-border"></span>
+						</div>
+					{/if}
+
+					{#if methods.password_login}
+						<form class="space-y-6" onsubmit={login}>
+							<div class="space-y-4">
+								<div class="space-y-2">
+									<Label for="username">Username</Label>
+									<Input id="username" bind:value={username} autocomplete="username" required class="h-11" />
+								</div>
+								<div class="space-y-2">
+									<Label for="password">Password</Label>
+									<Input
+										id="password"
+										type="password"
+										bind:value={password}
+										autocomplete="current-password"
+										required
+										class="h-11"
+									/>
+								</div>
+							</div>
+							<Button type="submit" class="group h-11 w-full text-base" disabled={busy}>
+								{#if busy}
+									<Loader2Icon class="animate-spin" /> Signing in
+								{:else}
+									Sign in
+									<ArrowRightIcon class="transition-transform group-hover:translate-x-0.5" />
+								{/if}
+							</Button>
+						</form>
+					{/if}
+				{/if}
 
 				{#if error}
 					<div
@@ -92,20 +158,13 @@
 					</div>
 				{/if}
 
-				<Button type="submit" class="group h-11 w-full text-base" disabled={busy}>
-					{#if busy}
-						<Loader2Icon class="animate-spin" /> Signing in
-					{:else}
-						Sign in
-						<ArrowRightIcon class="transition-transform group-hover:translate-x-0.5" />
-					{/if}
-				</Button>
-
-				<p class="text-xs leading-relaxed text-muted-foreground">
-					No account? Create one on the server with
-					<code class="rounded bg-muted px-1.5 py-0.5 text-foreground">locci user add &lt;name&gt; --admin</code>
-				</p>
-			</form>
+				{#if methods?.password_login !== false}
+					<p class="text-xs leading-relaxed text-muted-foreground">
+						No account? Create one on the server with
+						<code class="rounded bg-muted px-1.5 py-0.5 text-foreground">locci user add &lt;name&gt; --admin</code>
+					</p>
+				{/if}
+			</div>
 		</div>
 	</div>
 

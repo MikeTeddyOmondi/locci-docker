@@ -183,6 +183,10 @@ that is an API server, a web UI and a CLI.
     browser (printing the URL too) and saves the token the server sends back.
     `locci auth password-login on|off` writes the setting straight to the
     database on the server host, as break-glass access when SSO is broken.
+  - Login page: a "Continue with ..." button per enabled provider, the
+    password form only while password login is on, and pickup of the token
+    (or error) from the URL fragment, which is then cleared. Users signed up
+    through SSO carry an "SSO" badge on the Users page.
 
 ### Changed
 
