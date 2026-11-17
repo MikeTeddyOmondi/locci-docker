@@ -4,7 +4,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import DownloadIcon from '@lucide/svelte/icons/download';
-	import Loader2Icon from '@lucide/svelte/icons/loader-2';
+	import { Label } from '$lib/components/ui/label/index.js';
 	import SparklesIcon from '@lucide/svelte/icons/sparkles';
 	import TrashIcon from '@lucide/svelte/icons/trash';
 	import LayersIcon from '@lucide/svelte/icons/layers';
@@ -13,6 +13,7 @@
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import CopyId from '$lib/components/CopyId.svelte';
 	import DataTable from '$lib/components/DataTable.svelte';
+	import FormDialog from '$lib/components/FormDialog.svelte';
 	import { get, post, del } from '$lib/api.js';
 	import { bytes, shortId, ago } from '$lib/format.js';
 	import { attempt, confirm, notify } from '$lib/session.svelte.js';
@@ -20,7 +21,7 @@
 	let images = $state([]);
 	let loading = $state(true);
 	let ref = $state('');
-	let pulling = $state(false);
+	let pullOpen = $state(false);
 
 	async function load() {
 		await attempt(async () => (images = (await get('/images')).images));
@@ -35,13 +36,13 @@
 	const tags = (im) => (im.RepoTags?.length ? im.RepoTags : ['<none>']);
 	const title = (im) => im.RepoTags?.[0] || shortId(im.Id);
 
-	async function pull(e) {
-		e.preventDefault();
-		pulling = true;
-		await attempt(() => post('/images/pull', { image: ref }), `Pulled ${ref}`);
-		pulling = false;
-		ref = '';
-		load();
+	async function pull() {
+		const ok = await attempt(() => post('/images/pull', { image: ref }), `Pulled ${ref}`);
+		if (ok) {
+			ref = '';
+			load();
+		}
+		return ok;
 	}
 
 	async function remove(im) {
@@ -69,15 +70,26 @@
 <PageHeader kicker="Manifest 02 · Images" title="Images" description={loading ? 'Reading the hold...' : `${images.length} images, ${bytes(total)} on disk`}>
 	{#snippet actions()}
 		<Button variant="outline" onclick={prune}><SparklesIcon /> Prune dangling</Button>
+		<Button onclick={() => (pullOpen = true)}><DownloadIcon /> Pull image</Button>
 	{/snippet}
 </PageHeader>
 
-<form onsubmit={pull} class="rise mb-5 flex flex-col gap-2 rounded-xl border bg-card p-3 sm:flex-row">
-	<Input bind:value={ref} placeholder="Image to pull, e.g. nginx:alpine" required class="h-10 flex-1 font-mono" />
-	<Button type="submit" class="h-10" disabled={pulling}>
-		{#if pulling}<Loader2Icon class="animate-spin" /> Pulling{:else}<DownloadIcon /> Pull image{/if}
-	</Button>
-</form>
+<FormDialog
+	bind:open={pullOpen}
+	kicker="Take on cargo"
+	title="Pull an image"
+	description="Fetches the image from its registry onto this host."
+	submitLabel="Pull image"
+	busyLabel="Pulling"
+	icon={DownloadIcon}
+	onsubmit={pull}
+>
+	<div class="grid gap-2">
+		<Label for="image-ref">Image</Label>
+		<Input id="image-ref" bind:value={ref} placeholder="nginx:alpine" required class="font-mono" />
+		<p class="text-xs text-muted-foreground">Name and optional tag or digest. Defaults to <code>:latest</code>.</p>
+	</div>
+</FormDialog>
 
 {#if loading}
 	<ListSkeleton cols={4} />

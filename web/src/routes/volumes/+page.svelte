@@ -2,6 +2,7 @@
 	import * as Table from '$lib/components/ui/table/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
+	import { Label } from '$lib/components/ui/label/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import TrashIcon from '@lucide/svelte/icons/trash';
@@ -11,6 +12,7 @@
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import CopyId from '$lib/components/CopyId.svelte';
 	import DataTable from '$lib/components/DataTable.svelte';
+	import FormDialog from '$lib/components/FormDialog.svelte';
 	import { get, post, del } from '$lib/api.js';
 	import { ago } from '$lib/format.js';
 	import { attempt, confirm } from '$lib/session.svelte.js';
@@ -18,6 +20,7 @@
 	let volumes = $state([]);
 	let loading = $state(true);
 	let name = $state('');
+	let createOpen = $state(false);
 
 	async function load() {
 		await attempt(async () => (volumes = (await get('/volumes')).volumes || []));
@@ -27,11 +30,13 @@
 		load();
 	});
 
-	async function create(e) {
-		e.preventDefault();
-		await attempt(() => post('/volumes', { name }), `Created ${name}`);
-		name = '';
-		load();
+	async function create() {
+		const ok = await attempt(() => post('/volumes', { name }), `Created ${name}`);
+		if (ok) {
+			name = '';
+			load();
+		}
+		return ok;
 	}
 
 	async function remove(v) {
@@ -44,12 +49,28 @@
 
 <svelte:head><title>Volumes · locci</title></svelte:head>
 
-<PageHeader kicker="Manifest 04 · Volumes" title="Volumes" description="Cargo that outlives its container." />
+<PageHeader kicker="Manifest 04 · Volumes" title="Volumes" description="Cargo that outlives its container.">
+	{#snippet actions()}
+		<Button onclick={() => (createOpen = true)}><PlusIcon /> New volume</Button>
+	{/snippet}
+</PageHeader>
 
-<form onsubmit={create} class="rise mb-5 flex flex-col gap-2 rounded-xl border bg-card p-3 sm:flex-row">
-	<Input bind:value={name} placeholder="Volume name" required class="h-10 flex-1" />
-	<Button type="submit" class="h-10"><PlusIcon /> Create volume</Button>
-</form>
+<FormDialog
+	bind:open={createOpen}
+	kicker="Reserve a hold"
+	title="Create a volume"
+	description="A named volume keeps data across container restarts and removals."
+	submitLabel="Create volume"
+	busyLabel="Creating"
+	icon={PlusIcon}
+	onsubmit={create}
+>
+	<div class="grid gap-2">
+		<Label for="vol-name">Name</Label>
+		<Input id="vol-name" bind:value={name} placeholder="pgdata" required />
+		<p class="text-xs text-muted-foreground">Mount it from a container as <code>{name || 'name'}:/path</code>.</p>
+	</div>
+</FormDialog>
 
 {#if loading}
 	<ListSkeleton cols={4} />

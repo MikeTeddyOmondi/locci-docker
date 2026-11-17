@@ -3,6 +3,7 @@
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
+	import { Label } from '$lib/components/ui/label/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import TrashIcon from '@lucide/svelte/icons/trash';
@@ -13,6 +14,7 @@
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import CopyId from '$lib/components/CopyId.svelte';
 	import DataTable from '$lib/components/DataTable.svelte';
+	import FormDialog from '$lib/components/FormDialog.svelte';
 	import { get, post, del } from '$lib/api.js';
 	import { shortId } from '$lib/format.js';
 	import { attempt, confirm } from '$lib/session.svelte.js';
@@ -22,7 +24,12 @@
 	let name = $state('');
 	let driver = $state('bridge');
 	const builtin = ['bridge', 'host', 'none'];
-	const drivers = ['bridge', 'overlay', 'macvlan'];
+	const drivers = [
+		['bridge', 'Containers on this host'],
+		['overlay', 'Spans hosts in a swarm'],
+		['macvlan', 'Own MAC address on the LAN']
+	];
+	let createOpen = $state(false);
 
 	async function load() {
 		await attempt(async () => (networks = (await get('/networks')).networks));
@@ -34,11 +41,14 @@
 
 	const subnets = (n) => (n.IPAM?.Config || []).map((c) => c.Subnet).filter(Boolean);
 
-	async function create(e) {
-		e.preventDefault();
-		await attempt(() => post('/networks', { name, driver }), `Created ${name}`);
-		name = '';
-		load();
+	async function create() {
+		const ok = await attempt(() => post('/networks', { name, driver }), `Created ${name}`);
+		if (ok) {
+			name = '';
+			driver = 'bridge';
+			load();
+		}
+		return ok;
 	}
 
 	async function remove(n) {
@@ -51,23 +61,40 @@
 
 <svelte:head><title>Networks · locci</title></svelte:head>
 
-<PageHeader kicker="Manifest 03 · Networks" title="Networks" description="Shipping lanes between your containers." />
+<PageHeader kicker="Manifest 03 · Networks" title="Networks" description="Shipping lanes between your containers.">
+	{#snippet actions()}
+		<Button onclick={() => (createOpen = true)}><PlusIcon /> New network</Button>
+	{/snippet}
+</PageHeader>
 
-<form onsubmit={create} class="rise mb-5 flex flex-col gap-2 rounded-xl border bg-card p-3 sm:flex-row">
-	<Input bind:value={name} placeholder="Network name" required class="h-10 flex-1" />
-	<div class="flex gap-2">
+<FormDialog
+	bind:open={createOpen}
+	kicker="Open a lane"
+	title="Create a network"
+	description="Containers on the same network can reach each other by name."
+	submitLabel="Create network"
+	busyLabel="Creating"
+	icon={PlusIcon}
+	onsubmit={create}
+>
+	<div class="grid gap-2">
+		<Label for="net-name">Name</Label>
+		<Input id="net-name" bind:value={name} placeholder="backend" required />
+	</div>
+	<div class="grid gap-2">
+		<Label>Driver</Label>
 		<Select.Root type="single" bind:value={driver}>
-			<Select.Trigger class="h-10 flex-1 font-mono sm:w-36">{driver}</Select.Trigger>
+			<Select.Trigger class="w-full font-mono">{driver}</Select.Trigger>
 			<Select.Content>
-				<Select.Group>
-					<Select.Label class="kicker">Driver</Select.Label>
-					{#each drivers as d}<Select.Item value={d} label={d} class="font-mono" />{/each}
-				</Select.Group>
+				{#each drivers as [d, hint]}
+					<Select.Item value={d} label={d}>
+						<div><div class="font-mono">{d}</div><div class="text-xs text-muted-foreground">{hint}</div></div>
+					</Select.Item>
+				{/each}
 			</Select.Content>
 		</Select.Root>
-		<Button type="submit" class="h-10"><PlusIcon /> Create</Button>
 	</div>
-</form>
+</FormDialog>
 
 {#if loading}
 	<ListSkeleton cols={5} />

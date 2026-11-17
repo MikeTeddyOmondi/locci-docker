@@ -1,5 +1,4 @@
 <script>
-	import * as Card from '$lib/components/ui/card/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -15,12 +14,14 @@
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import ListSkeleton from '$lib/components/ListSkeleton.svelte';
 	import DataTable from '$lib/components/DataTable.svelte';
+	import FormDialog from '$lib/components/FormDialog.svelte';
 	import { get, post, del } from '$lib/api.js';
 	import { attempt, confirm, session } from '$lib/session.svelte.js';
 
 	let users = $state([]);
 	let loading = $state(true);
 	let f = $state({ username: '', password: '', role: 'user' });
+	let addOpen = $state(false);
 
 	async function load() {
 		await attempt(async () => (users = (await get('/users')).users));
@@ -30,11 +31,13 @@
 		load();
 	});
 
-	async function create(e) {
-		e.preventDefault();
+	async function create() {
 		const ok = await attempt(() => post('/users', $state.snapshot(f)), `Created ${f.username}`);
-		if (ok) f = { username: '', password: '', role: 'user' };
-		load();
+		if (ok) {
+			f = { username: '', password: '', role: 'user' };
+			load();
+		}
+		return ok;
 	}
 
 	async function remove(u) {
@@ -53,97 +56,97 @@
 
 <svelte:head><title>Users · locci</title></svelte:head>
 
-<PageHeader kicker="Harbour master · Crew" title="Users" description="Who can come aboard, and what they can touch." />
+<PageHeader kicker="Harbour master · Crew" title="Users" description="Who can come aboard, and what they can touch.">
+	{#snippet actions()}
+		<Button onclick={() => (addOpen = true)}><UserPlusIcon /> Add user</Button>
+	{/snippet}
+</PageHeader>
 
-<div class="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
-	<div class="order-2 min-w-0 lg:order-1">
-		{#if loading}
-			<ListSkeleton rows={4} cols={4} />
-		{:else if !users.length}
-			<EmptyState icon={UsersIcon} title="No crew yet" />
-		{:else}
-			{#snippet avatar(u)}
-				<Avatar.Root class="size-9 rounded-lg">
-					<Avatar.Fallback class="ribbed rounded-lg font-mono text-xs font-semibold {u.role === 'admin' ? 'bg-primary/15 text-primary' : 'bg-muted'}">
-						{u.username.slice(0, 2).toUpperCase()}
-					</Avatar.Fallback>
-				</Avatar.Root>
-			{/snippet}
-			{#snippet role(u)}
-				{#if u.role === 'admin'}<span class="flex items-center gap-1 text-xs text-primary"><ShieldIcon class="size-3" />admin</span>{:else}<span class="text-xs text-muted-foreground">user</span>{/if}
-			{/snippet}
-			{#snippet youBadge(u)}
-				{#if isMe(u)}<Badge variant="outline" class="text-[0.65rem]">you</Badge>{/if}
-			{/snippet}
-			{#snippet deleteBtn(u)}
-				{#if !isMe(u)}
-					<Button variant="ghost" size="icon-sm" class="text-muted-foreground hover:text-destructive" onclick={() => remove(u)} aria-label="Delete {u.username}"><TrashIcon /></Button>
-				{/if}
-			{/snippet}
-
-			<DataTable
-				items={users}
-				key={(u) => u.id}
-				noun="users"
-				columns={[{ label: 'User' }, { label: 'Role' }, { label: 'Since' }, { label: '' }]}
-			>
-				{#snippet row(u)}
-					<Table.Cell class="pl-4">
-						<div class="flex items-center gap-3">
-							{@render avatar(u)}
-							<span class="font-medium">{u.username}</span>
-							{@render youBadge(u)}
-						</div>
-					</Table.Cell>
-					<Table.Cell>{@render role(u)}</Table.Cell>
-					<Table.Cell class="text-xs text-muted-foreground">{when(u.created_at)}</Table.Cell>
-					<Table.Cell class="pr-4 text-right">{@render deleteBtn(u)}</Table.Cell>
-				{/snippet}
-				{#snippet card(u)}
-					<div class="flex items-center gap-3">
-						{@render avatar(u)}
-						<div class="min-w-0 flex-1">
-							<div class="flex items-center gap-2"><span class="truncate font-medium">{u.username}</span>{@render youBadge(u)}</div>
-							<div class="flex items-center gap-2 text-xs text-muted-foreground">{@render role(u)}<span>since {when(u.created_at)}</span></div>
-						</div>
-						{@render deleteBtn(u)}
-					</div>
-				{/snippet}
-			</DataTable>
-		{/if}
+<FormDialog
+	bind:open={addOpen}
+	kicker="Sign on"
+	title="Add a user"
+	description="They sign in with this username and password."
+	submitLabel="Add user"
+	busyLabel="Adding"
+	icon={UserPlusIcon}
+	onsubmit={create}
+>
+	<div class="grid gap-2">
+		<Label for="u-name">Username</Label>
+		<Input id="u-name" bind:value={f.username} required autocomplete="off" />
 	</div>
+	<div class="grid gap-2">
+		<Label for="u-pass">Password</Label>
+		<Input id="u-pass" type="password" bind:value={f.password} minlength={8} required autocomplete="new-password" placeholder="8+ characters" />
+	</div>
+	<div class="grid gap-2">
+		<Label>Role</Label>
+		<Select.Root type="single" bind:value={f.role}>
+			<Select.Trigger class="w-full capitalize">{f.role}</Select.Trigger>
+			<Select.Content>
+				<Select.Item value="user" label="User">
+					<div><div>User</div><div class="text-xs text-muted-foreground">Manage containers and images</div></div>
+				</Select.Item>
+				<Select.Item value="admin" label="Admin">
+					<div><div>Admin</div><div class="text-xs text-muted-foreground">Also users and the audit log</div></div>
+				</Select.Item>
+			</Select.Content>
+		</Select.Root>
+	</div>
+</FormDialog>
 
-	<Card.Root class="rise order-1 h-fit lg:order-2">
-		<Card.Header>
-			<div class="kicker">Sign on</div>
-			<Card.Title class="font-heading">Add a user</Card.Title>
-		</Card.Header>
-		<Card.Content>
-			<form onsubmit={create} class="space-y-4">
-				<div class="space-y-2">
-					<Label for="u-name">Username</Label>
-					<Input id="u-name" bind:value={f.username} required autocomplete="off" />
+{#if loading}
+	<ListSkeleton rows={4} cols={4} />
+{:else if !users.length}
+	<EmptyState icon={UsersIcon} title="No crew yet" />
+{:else}
+	{#snippet avatar(u)}
+		<Avatar.Root class="size-9 rounded-lg">
+			<Avatar.Fallback class="ribbed rounded-lg font-mono text-xs font-semibold {u.role === 'admin' ? 'bg-primary/15 text-primary' : 'bg-muted'}">
+				{u.username.slice(0, 2).toUpperCase()}
+			</Avatar.Fallback>
+		</Avatar.Root>
+	{/snippet}
+	{#snippet role(u)}
+		{#if u.role === 'admin'}<span class="flex items-center gap-1 text-xs text-primary"><ShieldIcon class="size-3" />admin</span>{:else}<span class="text-xs text-muted-foreground">user</span>{/if}
+	{/snippet}
+	{#snippet youBadge(u)}
+		{#if isMe(u)}<Badge variant="outline" class="text-[0.65rem]">you</Badge>{/if}
+	{/snippet}
+	{#snippet deleteBtn(u)}
+		{#if !isMe(u)}
+			<Button variant="ghost" size="icon-sm" class="text-muted-foreground hover:text-destructive" onclick={() => remove(u)} aria-label="Delete {u.username}"><TrashIcon /></Button>
+		{/if}
+	{/snippet}
+
+	<DataTable
+		items={users}
+		key={(u) => u.id}
+		noun="users"
+		columns={[{ label: 'User' }, { label: 'Role' }, { label: 'Since' }, { label: '' }]}
+	>
+		{#snippet row(u)}
+			<Table.Cell class="pl-4">
+				<div class="flex items-center gap-3">
+					{@render avatar(u)}
+					<span class="font-medium">{u.username}</span>
+					{@render youBadge(u)}
 				</div>
-				<div class="space-y-2">
-					<Label for="u-pass">Password</Label>
-					<Input id="u-pass" type="password" bind:value={f.password} minlength={8} required autocomplete="new-password" placeholder="8+ characters" />
+			</Table.Cell>
+			<Table.Cell>{@render role(u)}</Table.Cell>
+			<Table.Cell class="text-xs text-muted-foreground">{when(u.created_at)}</Table.Cell>
+			<Table.Cell class="pr-4 text-right">{@render deleteBtn(u)}</Table.Cell>
+		{/snippet}
+		{#snippet card(u)}
+			<div class="flex items-center gap-3">
+				{@render avatar(u)}
+				<div class="min-w-0 flex-1">
+					<div class="flex items-center gap-2"><span class="truncate font-medium">{u.username}</span>{@render youBadge(u)}</div>
+					<div class="flex items-center gap-2 text-xs text-muted-foreground">{@render role(u)}<span>since {when(u.created_at)}</span></div>
 				</div>
-				<div class="space-y-2">
-					<Label>Role</Label>
-					<Select.Root type="single" bind:value={f.role}>
-						<Select.Trigger class="w-full capitalize">{f.role}</Select.Trigger>
-						<Select.Content>
-							<Select.Item value="user" label="User">
-								<div><div>User</div><div class="text-xs text-muted-foreground">Manage containers and images</div></div>
-							</Select.Item>
-							<Select.Item value="admin" label="Admin">
-								<div><div>Admin</div><div class="text-xs text-muted-foreground">Also users and the audit log</div></div>
-							</Select.Item>
-						</Select.Content>
-					</Select.Root>
-				</div>
-				<Button type="submit" class="w-full"><UserPlusIcon /> Add user</Button>
-			</form>
-		</Card.Content>
-	</Card.Root>
-</div>
+				{@render deleteBtn(u)}
+			</div>
+		{/snippet}
+	</DataTable>
+{/if}
