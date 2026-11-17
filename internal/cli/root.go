@@ -27,7 +27,7 @@ func newRoot() *cobra.Command {
 	var output string
 	root.PersistentFlags().StringVarP(&output, "output", "o", "table", "output format: table or json")
 	// Not "--env": `run -e/--env` already sets container variables.
-	root.PersistentFlags().StringVarP(&envFlag, "environment", "E", "", "environment (Docker host) to use; default: LOCCI_ENV, then `locci env use`, then the server default")
+	root.PersistentFlags().StringVarP(&envFlag, "environment", "E", "", "environment (Docker host) to use; default: LOCCI_ENV, then the one saved by locci env use, then the server default")
 	root.PersistentPreRun = func(cmd *cobra.Command, args []string) { outputJSON = output == "json" }
 
 	root.AddGroup(
