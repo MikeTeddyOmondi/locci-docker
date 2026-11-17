@@ -82,6 +82,8 @@ that is an API server, a web UI and a CLI.
     must allow `AllowStreamLocalForwarding` (and `AllowTcpForwarding`); the
     error says so when it refuses. Fingerprints read `<type> SHA256:...`, like
     `ssh-keygen -lf`.
+    An unreachable SSH host reports the SSH error (for example "connection
+    refused") instead of Docker's generic message about a placeholder host.
   - `internal/env` registry: one cached `docker.Service` per environment,
     connected on first use. A cached client remembers a hash of the settings it
     was built from, so editing a host rebuilds it automatically. A health loop
@@ -122,6 +124,9 @@ that is an API server, a web UI and a CLI.
     `locci env use` (`--clear` follows the server default again). The client
     rewrites Docker resource paths to `/environments/<env>/...`, so existing
     commands work against any host unchanged.
+    `locci env edit NAME` changes only the flags given (`--label`, `--url`,
+    `--tls-*`, `--ssh-key`, `--reset-host-key`), tests the merged settings
+    with the stored key first and pins the key it showed.
   - Web UI: the fleet pages live under `/e/<env>/...` (dashboard,
     containers, images, networks, volumes, logs, stats, console), and the API
     client scopes Docker calls (including the terminal WebSocket) to that

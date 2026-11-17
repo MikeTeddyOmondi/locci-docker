@@ -46,7 +46,7 @@ func envCmd() *cobra.Command {
   locci env use edge          # later commands run against edge
   locci ps -E local           # one command against another environment`,
 	}
-	cmd.AddCommand(envLsCmd(), envAddCmd(), envRmCmd(), envTestCmd(), envUseCmd(), envDefaultCmd())
+	cmd.AddCommand(envLsCmd(), envAddCmd(), envEditCmd(), envRmCmd(), envTestCmd(), envUseCmd(), envDefaultCmd())
 	return cmd
 }
 
@@ -152,6 +152,87 @@ func envAddCmd() *cobra.Command {
 	f.StringVar(&tlsCert, "tls-cert", "", "client certificate file (tcp+tls)")
 	f.StringVar(&tlsKey, "tls-key", "", "client key file (tcp+tls), stored encrypted")
 	f.StringVar(&sshKey, "ssh-key", "", "unencrypted private key file (ssh), stored encrypted")
+	f.BoolVar(&noTest, "no-test", false, "save without testing the connection first")
+	return cmd
+}
+
+func envEditCmd() *cobra.Command {
+	var label, rawURL, tlsCA, tlsCert, tlsKey, sshKey string
+	var resetHostKey, noTest bool
+	cmd := &cobra.Command{
+		Use:   "edit NAME",
+		Short: "Change an environment (admin); only the flags given change, keys stay unless replaced",
+		Example: `  locci env edit edge --label "Edge box"
+  locci env edit edge --url ssh://deploy@10.0.0.9     # new host: its key is pinned again
+  locci env edit edge --reset-host-key                # the host was rebuilt on purpose`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c := api()
+			path := "/api/v1/environments/" + url.PathEscape(args[0])
+			var cur envInfo
+			if err := c.Do("GET", path, nil, &cur); err != nil {
+				return err
+			}
+
+			body := map[string]any{"name": cur.Name, "kind": cur.Kind}
+			if label != "" {
+				body["label"] = label
+			}
+			body["url"] = cur.URL
+			if rawURL != "" {
+				body["url"] = rawURL
+			}
+			for field, p := range map[string]string{"tls_ca": tlsCA, "tls_cert": tlsCert, "tls_key": tlsKey, "ssh_key": sshKey} {
+				v, err := readFileFlag(p)
+				if err != nil {
+					return err
+				}
+				if v != "" {
+					body[field] = v
+				}
+			}
+			if resetHostKey {
+				body["reset_host_key"] = true
+			}
+
+			// Test the merged settings; blank keys are taken from the stored environment.
+			if !noTest {
+				var res struct {
+					OK    bool     `json:"ok"`
+					Error string   `json:"error"`
+					Host  hostInfo `json:"host"`
+				}
+				if err := c.Do("POST", "/api/v1/environments/test", body, &res); err != nil {
+					return err
+				}
+				if !res.OK {
+					return fmt.Errorf("connection test failed: %s (use --no-test to save anyway)", res.Error)
+				}
+				printHost(res.Host)
+				if res.Host.SSHHostKey != "" {
+					body["ssh_host_key"] = res.Host.SSHHostKey
+				}
+			}
+
+			var saved envInfo
+			if err := c.Do("PATCH", path, body, &saved); err != nil {
+				return err
+			}
+			if outputJSON {
+				return printJSON(saved)
+			}
+			fmt.Printf("saved %s (%s)\n", saved.Name, saved.Label)
+			return nil
+		},
+	}
+	f := cmd.Flags()
+	f.StringVar(&label, "label", "", "new display name")
+	f.StringVar(&rawURL, "url", "", "new URL (for ssh this also re-pins the host key)")
+	f.StringVar(&tlsCA, "tls-ca", "", "replace the CA certificate (file)")
+	f.StringVar(&tlsCert, "tls-cert", "", "replace the client certificate (file)")
+	f.StringVar(&tlsKey, "tls-key", "", "replace the client key (file)")
+	f.StringVar(&sshKey, "ssh-key", "", "replace the SSH private key (file)")
+	f.BoolVar(&resetHostKey, "reset-host-key", false, "forget the pinned SSH host key and pin the one seen now")
 	f.BoolVar(&noTest, "no-test", false, "save without testing the connection first")
 	return cmd
 }
