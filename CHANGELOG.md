@@ -66,6 +66,10 @@ that is an API server, a web UI and a CLI.
     on first start whose empty URL means "DOCKER_HOST or the local socket", so
     existing installs behave as before. A partial unique index allows only one
     default, and the default can't be deleted.
+  - `internal/secret`: AES-256-GCM encryption for stored secrets, keyed by
+    `LOCCI_SECRET_KEY` (32 random bytes, base64). Without the key the server
+    still runs; only saving a remote host's key is refused, with a message
+    explaining how to generate one.
 
 ### Changed
 

@@ -18,6 +18,7 @@ type Config struct {
 	DeployJobTimeout int
 	GinMode          string
 	DatabaseURL      string
+	SecretKey        string // LOCCI_SECRET_KEY, base64 32 bytes (internal/secret)
 }
 
 // Load reads .env if present, then the process environment.
@@ -34,6 +35,7 @@ func Load() Config {
 		DeployJobTimeout: getInt("DEPLOY_JOB_TIMEOUT", 1800),
 		GinMode:          get("GIN_MODE", "release"),
 		DatabaseURL:      get("DATABASE_URL", "file:locci.db"),
+		SecretKey:        os.Getenv("LOCCI_SECRET_KEY"),
 	}
 }
 
