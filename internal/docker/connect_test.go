@@ -244,3 +244,15 @@ func TestSSHHost(t *testing.T) {
 		t.Fatal("expected a bad key to be rejected")
 	}
 }
+
+func TestHostKeyAlgorithms(t *testing.T) {
+	if hostKeyAlgorithms("") != nil || hostKeyAlgorithms("junk") != nil {
+		t.Fatal("no pin should leave negotiation alone")
+	}
+	ek, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	pub, _ := ssh.NewPublicKey(&ek.PublicKey)
+	got := hostKeyAlgorithms(string(ssh.MarshalAuthorizedKey(pub)))
+	if len(got) != 1 || got[0] != "ecdsa-sha2-nistp256" {
+		t.Fatalf("ecdsa pin: %v", got)
+	}
+}

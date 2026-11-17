@@ -77,6 +77,11 @@ that is an API server, a web UI and a CLI.
     the URL such as `ssh://me@host/run/user/1000/docker.sock` for rootless
     Docker), pins the host key on first connect and refuses a changed key, and
     redials a dropped connection. Keys must be unencrypted (deploy keys).
+    Once a key is pinned only its type is negotiated, so a server with several
+    host keys can't trip the check by offering another one. The remote sshd
+    must allow `AllowStreamLocalForwarding` (and `AllowTcpForwarding`); the
+    error says so when it refuses. Fingerprints read `<type> SHA256:...`, like
+    `ssh-keygen -lf`.
   - `internal/env` registry: one cached `docker.Service` per environment,
     connected on first use. A cached client remembers a hash of the settings it
     was built from, so editing a host rebuilds it automatically. A health loop

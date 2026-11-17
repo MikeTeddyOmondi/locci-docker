@@ -122,10 +122,11 @@ func newSSH(o Options) (*Service, error) {
 		socket: cmp(strings.TrimSuffix(u.Path, "/"), defaultSocket),
 	}
 	d.config = &ssh.ClientConfig{
-		User:            d.user,
-		Auth:            []ssh.AuthMethod{ssh.PublicKeys(signer)},
-		HostKeyCallback: d.checkHostKey(o.SSH.HostKey),
-		Timeout:         10 * time.Second,
+		User:              d.user,
+		Auth:              []ssh.AuthMethod{ssh.PublicKeys(signer)},
+		HostKeyCallback:   d.checkHostKey(o.SSH.HostKey),
+		HostKeyAlgorithms: hostKeyAlgorithms(o.SSH.HostKey),
+		Timeout:           10 * time.Second,
 	}
 
 	// The host part is a placeholder; every connection goes through d.dial.
@@ -138,6 +139,23 @@ func newSSH(o Options) (*Service, error) {
 		return nil, fmt.Errorf("docker client: %w", err)
 	}
 	return &Service{Client: cli, Domain: o.Domain, Log: o.Log, ssh: d}, nil
+}
+
+// hostKeyAlgorithms limits negotiation to the pinned key's type. Servers have
+// several host keys (RSA, ECDSA, Ed25519); without this a server could later
+// present a different, equally valid key and trip the "key changed" check.
+func hostKeyAlgorithms(pinned string) []string {
+	if pinned == "" {
+		return nil // first contact: accept the client's default preference
+	}
+	k, _, _, _, err := ssh.ParseAuthorizedKey([]byte(pinned))
+	if err != nil {
+		return nil
+	}
+	if k.Type() == ssh.KeyAlgoRSA {
+		return []string{ssh.KeyAlgoRSASHA512, ssh.KeyAlgoRSASHA256, ssh.KeyAlgoRSA}
+	}
+	return []string{k.Type()}
 }
 
 func cmp(v, def string) string {
@@ -179,6 +197,9 @@ func (d *sshDialer) dial(ctx context.Context, _, _ string) (net.Conn, error) {
 		d.conn.Close()
 		d.conn = nil
 		if attempt == 1 {
+			if strings.Contains(err.Error(), "open failed") {
+				return nil, fmt.Errorf("ssh server refused to forward to %s (enable AllowStreamLocalForwarding and AllowTcpForwarding in sshd_config, and check this user can use the socket): %w", d.socket, err)
+			}
 			return nil, fmt.Errorf("docker socket %s over ssh: %w", d.socket, err)
 		}
 	}

@@ -213,7 +213,7 @@ type TestResult struct {
 	Memory        int64  `json:"memory"`
 	Containers    int    `json:"containers"`
 	SSHHostKey    string `json:"ssh_host_key,omitempty"`
-	Fingerprint   string `json:"ssh_fingerprint,omitempty"` // SHA256:... for people to compare
+	Fingerprint   string `json:"ssh_fingerprint,omitempty"` // "<type> SHA256:..." for people to compare
 }
 
 // Test connects to an unsaved environment once, without caching or storing
@@ -238,7 +238,8 @@ func Test(ctx context.Context, o docker.Options) (TestResult, error) {
 	return res, nil
 }
 
-// Fingerprint turns an authorized_keys line into "SHA256:...", or "" if empty/invalid.
+// Fingerprint turns an authorized_keys line into "<type> SHA256:...", the
+// form `ssh-keygen -lf` prints, or "" if empty/invalid.
 func Fingerprint(authorizedKey string) string {
 	if authorizedKey == "" {
 		return ""
@@ -247,7 +248,7 @@ func Fingerprint(authorizedKey string) string {
 	if err != nil {
 		return ""
 	}
-	return ssh.FingerprintSHA256(k)
+	return k.Type() + " " + ssh.FingerprintSHA256(k)
 }
 
 // Close drops every cached connection.
