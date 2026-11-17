@@ -628,15 +628,17 @@ func (ds *DockerService) retryFailedJob(
 	jobID string,
 	queueName string,
 ) {
-	if retryCount > maxRetries {
+	if retryCount >= maxRetries {
 		msg.Ack(false)
 		ds.log.Warn(
 			ctx,
 			"job failed after exceeding maximum retries",
 			slog.String("jobID", jobID),
-			slog.String("retryCount", retryHeader),
+			slog.Int("retryCount", retryCount),
 			slog.Int("maxRetries", maxRetries),
 		)
+
+		return
 	}
 
 	// Prepare new headers with incremented retry count
