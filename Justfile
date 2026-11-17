@@ -1,44 +1,50 @@
+# locci: `just` lists recipes
+
 default:
     just --list
 
-tidy:
-    go mod tidy    
+# install web dependencies (first time)
+web-install:
+    cd web && npm install
 
+# build the web UI into internal/ui/dist (embedded by go build)
+web:
+    cd web && npm run build
+    touch internal/ui/dist/.gitkeep
+
+# run the UI with hot reload (proxies /api to `just run`)
+web-dev:
+    cd web && npm run dev
+
+# build the single binary (cgo is required by go-libsql)
 build:
-    go build -o locci ./cmd/locci
+    CGO_ENABLED=1 go build -o locci ./cmd/locci
 
-run:
-    just build
+# build UI + binary
+all: web build
+
+run: build
     ./locci serve
 
-run-bin:
-    go run ./cmd/locci serve
+test:
+    go vet ./...
+    go test ./...
+
+tidy:
+    go mod tidy
 
 build-image:
-    docker build -t ranckosolutionsinc/bundler-service-go:v1.0.0 .
+    docker build -t ranckosolutionsinc/locci:dev .
 
 run-container:
-    docker run -dp 8998:8998 \
-    --name docker-wrapper \
-    -v /var/run/docker.sock:/var/run/docker.sock \
-    -e _EXPERIMENTAL_DAGGER_RUNNER_HOST=docker-container://dagger-engine-v0.14.0 \
-    ranckosolutionsinc/docker-wrapper:v1.0.0
+    docker run -d --name locci -p 8998:8998 \
+      -v /var/run/docker.sock:/var/run/docker.sock \
+      -v locci-data:/data \
+      --env-file .env \
+      ranckosolutionsinc/locci:dev
 
 log:
-    docker logs -f docker-wrapper
-
-stop-container:
-    docker stop docker-wrapper
+    docker logs -f locci
 
 rm-container:
-    docker stop docker-wrapper
-    docker rm docker-wrapper
-
-compose:
-    docker-compose up -d
-
-compose-down:
-    docker-compose down
-
-compose-build:
-    docker-compose up -d --build
+    docker rm -f locci
