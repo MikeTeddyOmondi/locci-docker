@@ -18,6 +18,7 @@ image := "ranckosolutionsinc/locci"
 
 # list recipes
 default:
+    # print every recipe with its description, in file order
     @{{ just_executable() }} --list --unsorted
 
 # ---------------------------------------------------------------- setup
