@@ -132,7 +132,11 @@ that is an API server, a web UI and a CLI.
     per host (status, Docker version, CPUs, memory, running containers, OS)
     with admin actions to set the default, check now or remove, and an Add
     dialog per connection kind with **Test connection**, PEM file loading and
-    the SSH fingerprint to compare before it is pinned.
+    the SSH fingerprint to compare before it is pinned. **Edit** reuses the
+    dialog: name and kind are fixed, certificates are prefilled, a blank key
+    keeps the stored one, Test connection works without re-entering it, and an
+    SSH host's pinned key can be forgotten (it is dropped automatically when
+    the URL changes).
 
 ### Changed
 

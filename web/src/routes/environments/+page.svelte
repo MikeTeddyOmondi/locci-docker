@@ -8,6 +8,7 @@
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
+	import { Switch } from '$lib/components/ui/switch/index.js';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import ServerIcon from '@lucide/svelte/icons/server';
 	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
@@ -20,15 +21,17 @@
 	import CircleXIcon from '@lucide/svelte/icons/circle-x';
 	import FileUpIcon from '@lucide/svelte/icons/file-up';
 	import KeyRoundIcon from '@lucide/svelte/icons/key-round';
+	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import FormDialog from '$lib/components/FormDialog.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
-	import { get, post, del } from '$lib/api.js';
+	import { api, get, post, del } from '$lib/api.js';
 	import { bytes, ago } from '$lib/format.js';
 	import { attempt, confirm, session } from '$lib/session.svelte.js';
 	import { envs, loadEnvs, statusTone } from '$lib/env.svelte.js';
 
 	const isAdmin = $derived(session.user?.role === 'admin');
+	const patch = (path, body) => api('PATCH', path, body);
 
 	// Host details per environment name: undefined = loading, null = unavailable.
 	let details = $state({});
@@ -70,40 +73,58 @@
 			refresh();
 	}
 
-	// ---- add dialog ----
+	// ---- add / edit dialog ----
 
 	const kinds = [
 		['ssh', 'SSH', 'Reach the Docker socket over SSH; no Docker port exposed'],
 		['tcp+tls', 'TCP + TLS', "Docker's TLS port (2376) with client certificates"],
 		['local', 'Local socket', 'A socket or URL reachable from this server']
 	];
-	const blank = () => ({ name: '', label: '', kind: 'ssh', url: '', tls_ca: '', tls_cert: '', tls_key: '', ssh_key: '' });
+	const blank = () => ({
+		name: '', label: '', kind: 'ssh', url: '', tls_ca: '', tls_cert: '', tls_key: '', ssh_key: '', reset_host_key: false
+	});
 
-	let addOpen = $state(false);
+	let dialogOpen = $state(false);
+	let editing = $state(null); // the environment being edited, or null when adding
 	let f = $state(blank());
 	let test = $state(null); // { ok, host?, error? }
 	let testing = $state(false);
 
 	function openAdd() {
+		editing = null;
 		f = blank();
-		test = null;
-		addOpen = true;
+		dialogOpen = true;
+	}
+
+	// Name and kind are fixed; certificates are prefilled; keys stay blank
+	// (blank = keep the stored one, which is never sent back to the browser).
+	function openEdit(e) {
+		editing = e;
+		f = { ...blank(), name: e.name, label: e.label, kind: e.kind, url: e.url, tls_ca: e.tls_ca ?? '', tls_cert: e.tls_cert ?? '' };
+		dialogOpen = true;
 	}
 
 	// Any change to the connection invalidates an earlier test result.
 	$effect(() => {
-		void [f.kind, f.url, f.tls_ca, f.tls_cert, f.tls_key, f.ssh_key];
+		void [f.kind, f.url, f.tls_ca, f.tls_cert, f.tls_key, f.ssh_key, f.reset_host_key, dialogOpen];
 		test = null;
 	});
 
 	const placeholder = $derived(
 		{ ssh: 'ssh://deploy@10.0.0.5', 'tcp+tls': 'tcp://10.0.0.5:2376', local: 'unix:///var/run/docker.sock (empty = DOCKER_HOST)' }[f.kind]
 	);
+	// When editing, the server already holds a key unless the kind is local.
+	const keyOptional = $derived(!!editing?.has_secret);
+	const urlChanged = $derived(!!editing && f.url.trim() !== editing.url);
 
 	function body() {
 		const b = { name: f.name.trim(), label: f.label.trim(), kind: f.kind, url: f.url.trim() };
-		if (f.kind === 'tcp+tls') Object.assign(b, { tls_ca: f.tls_ca, tls_cert: f.tls_cert, tls_key: f.tls_key });
-		if (f.kind === 'ssh') b.ssh_key = f.ssh_key;
+		if (f.kind === 'tcp+tls') {
+			Object.assign(b, { tls_ca: f.tls_ca, tls_cert: f.tls_cert });
+			if (f.tls_key) b.tls_key = f.tls_key;
+		}
+		if (f.kind === 'ssh' && f.ssh_key) b.ssh_key = f.ssh_key;
+		if (editing && f.reset_host_key) b.reset_host_key = true;
 		return b;
 	}
 
@@ -117,7 +138,10 @@
 		const b = body();
 		// Pin exactly the SSH host key that the test showed.
 		if (test?.ok && test.host?.ssh_host_key) b.ssh_host_key = test.host.ssh_host_key;
-		const saved = await attempt(() => post('/environments', b), `Added ${b.label || b.name}`);
+		const label = b.label || b.name;
+		const saved = editing
+			? await attempt(() => patch(`/environments/${encodeURIComponent(editing.name)}`, b), `Saved ${label}`)
+			: await attempt(() => post('/environments', b), `Added ${label}`);
 		if (saved) refresh();
 		return saved;
 	}
@@ -167,6 +191,7 @@
 								</DropdownMenu.Trigger>
 								<DropdownMenu.Content align="end" class="w-48">
 									<DropdownMenu.Item onclick={() => goto(`/e/${encodeURIComponent(e.name)}`)}><ServerIcon /> Open</DropdownMenu.Item>
+									<DropdownMenu.Item onclick={() => openEdit(e)}><PencilIcon /> Edit</DropdownMenu.Item>
 									{#if !e.is_default}
 										<DropdownMenu.Item onclick={() => setDefault(e)}><StarIcon /> Set as default</DropdownMenu.Item>
 									{/if}
@@ -210,8 +235,8 @@
 	</ul>
 {/if}
 
-{#snippet pemField(field, label, hint)}
-	<div class="grid gap-2">
+{#snippet pemField(field, label, hint, secret = false)}
+	<div class="grid content-start gap-2">
 		<div class="flex items-center justify-between">
 			<Label for="env-{field}">{label}</Label>
 			<label class="{buttonVariants({ variant: 'ghost', size: 'xs' })} cursor-pointer text-muted-foreground">
@@ -219,37 +244,45 @@
 				<input type="file" class="sr-only" onchange={(e) => loadFile(field, e)} />
 			</label>
 		</div>
-		<Textarea id="env-{field}" bind:value={f[field]} required placeholder="-----BEGIN ..." class="min-h-20 font-mono text-[0.7rem]" />
+		<Textarea
+			id="env-{field}"
+			bind:value={f[field]}
+			required={!(secret && keyOptional)}
+			placeholder={secret && keyOptional ? 'Stored. Leave blank to keep it, or paste a new one.' : '-----BEGIN ...'}
+			class="min-h-20 font-mono text-[0.7rem]"
+		/>
 		{#if hint}<p class="text-xs text-muted-foreground">{hint}</p>{/if}
 	</div>
 {/snippet}
 
 <FormDialog
-	bind:open={addOpen}
-	kicker="New berth"
-	title="Add an environment"
-	description="Connect another Docker host. Keys are stored encrypted and never shown again."
-	submitLabel="Save environment"
+	bind:open={dialogOpen}
+	kicker={editing ? 'Refit' : 'New berth'}
+	title={editing ? `Edit ${editing.label}` : 'Add an environment'}
+	description={editing
+		? 'Name and connection kind are fixed. Leave a key blank to keep the stored one.'
+		: 'Connect another Docker host. Keys are stored encrypted and never shown again.'}
+	submitLabel={editing ? 'Save changes' : 'Save environment'}
 	busyLabel="Saving"
-	icon={PlusIcon}
+	icon={editing ? PencilIcon : PlusIcon}
 	onsubmit={save}
 	class="sm:max-w-xl"
 >
 	<div class="grid gap-4 sm:grid-cols-2">
-		<div class="grid gap-2">
+		<div class="grid content-start gap-2">
 			<Label for="env-name">Name</Label>
-			<Input id="env-name" bind:value={f.name} required pattern="[a-z0-9][a-z0-9\-]{'{'}0,62{'}'}" placeholder="edge" class="font-mono" />
+			<Input id="env-name" bind:value={f.name} disabled={!!editing} required pattern="[a-z0-9][a-z0-9\-]{'{'}0,62{'}'}" placeholder="edge" class="font-mono" />
 			<p class="text-xs text-muted-foreground">Used in URLs and the CLI. Lowercase, digits, dashes.</p>
 		</div>
-		<div class="grid gap-2">
+		<div class="grid content-start gap-2">
 			<Label for="env-label">Display name</Label>
 			<Input id="env-label" bind:value={f.label} placeholder={f.name || 'Edge box'} />
 		</div>
 	</div>
 
-	<div class="grid gap-2">
+	<div class="grid content-start gap-2">
 		<Label>Connection</Label>
-		<Select.Root type="single" bind:value={f.kind}>
+		<Select.Root type="single" bind:value={f.kind} disabled={!!editing}>
 			<Select.Trigger class="w-full">{kinds.find(([k]) => k === f.kind)?.[1]}</Select.Trigger>
 			<Select.Content>
 				{#each kinds as [value, label, hint]}
@@ -261,7 +294,7 @@
 		</Select.Root>
 	</div>
 
-	<div class="grid gap-2">
+	<div class="grid content-start gap-2">
 		<Label for="env-url">URL</Label>
 		<Input id="env-url" bind:value={f.url} required={f.kind !== 'local'} placeholder={placeholder} class="font-mono" />
 		{#if f.kind === 'ssh'}
@@ -272,13 +305,26 @@
 		{/if}
 	</div>
 
+	{#if f.kind === 'ssh' && editing?.ssh_fingerprint}
+		<div class="flex items-start justify-between gap-3 rounded-lg border p-3">
+			<div class="min-w-0 text-xs">
+				<div class="flex items-center gap-1.5 text-sm font-medium"><KeyRoundIcon class="size-3.5" /> Pinned host key</div>
+				<code class="mt-1 block break-all text-muted-foreground">{editing.ssh_fingerprint}</code>
+				<p class="mt-1 text-muted-foreground">
+					{urlChanged ? 'The URL changed, so this pin is dropped and the new host key is pinned on save.' : 'Forget it if the host was rebuilt and its key changed on purpose.'}
+				</p>
+			</div>
+			<Switch bind:checked={f.reset_host_key} disabled={urlChanged} aria-label="Forget pinned host key" />
+		</div>
+	{/if}
+
 	{#if f.kind === 'ssh'}
-		{@render pemField('ssh_key', 'Private key', 'An unencrypted deploy key whose public half is in the remote authorized_keys.')}
+		{@render pemField('ssh_key', 'Private key', 'An unencrypted deploy key whose public half is in the remote authorized_keys.', true)}
 	{:else if f.kind === 'tcp+tls'}
 		{@render pemField('tls_ca', 'CA certificate', '')}
 		<div class="grid gap-4 sm:grid-cols-2">
 			{@render pemField('tls_cert', 'Client certificate', '')}
-			{@render pemField('tls_key', 'Client key', '')}
+			{@render pemField('tls_key', 'Client key', '', true)}
 		</div>
 	{/if}
 
