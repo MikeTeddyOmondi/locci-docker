@@ -1,10 +1,10 @@
 # --- web UI ---
-FROM node:22-bookworm-slim AS web
+FROM oven/bun:1.4.3 AS web
 WORKDIR /src/web
-COPY web/package*.json ./
-RUN npm install
+COPY web/package.json web/bun.lock ./
+RUN bun install --frozen-lockfile
 COPY web/ ./
-RUN mkdir -p ../internal/ui/dist && npm run build
+RUN mkdir -p ../internal/ui/dist && bun run build
 
 # --- Go binary (cgo for go-libsql, glibc) ---
 FROM golang:1.24-bookworm AS build

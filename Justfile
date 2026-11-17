@@ -30,16 +30,16 @@ setup:
     test -f .env || cp .env.sample .env
     # fetch Go dependencies
     go mod download
-    # install the web UI's npm packages
-    cd web && npm install
+    # install the web UI's packages (bun.lock pins the versions)
+    cd web && bun install --frozen-lockfile
 
 # check the tools this project needs
 [group('setup')]
 doctor:
     # Go toolchain
     @go version
-    # Node, for building the web UI
-    @node --version
+    # Bun, for installing and building the web UI
+    @bun --version
     # C compiler, needed by go-libsql (cgo)
     @gcc --version | head -1
     # Docker daemon the server will manage
@@ -57,7 +57,7 @@ dev:
 [group('develop')]
 dev-web:
     # vite dev server; proxies /api to the server from `just dev`
-    cd web && npm run dev
+    cd web && bun run dev
 
 # format Go code
 [group('develop')]
@@ -85,7 +85,7 @@ tidy:
 [group('build')]
 web:
     # SvelteKit build straight into internal/ui/dist
-    cd web && npm run build
+    cd web && bun run build
     # the build wipes dist; restore the tracked placeholder
     touch internal/ui/dist/.gitkeep
 
