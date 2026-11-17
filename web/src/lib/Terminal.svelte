@@ -6,7 +6,9 @@
 
 	let { id, cmd = 'sh' } = $props();
 	let el;
-	let status = $state('connecting…');
+	let status = $state('connecting');
+
+	const BG = '#111827';
 
 	onMount(() => {
 		let term, ws, fit, observer;
@@ -15,7 +17,12 @@
 			const { Terminal } = await import('@xterm/xterm');
 			const { FitAddon } = await import('@xterm/addon-fit');
 
-			term = new Terminal({ cursorBlink: true, fontSize: 13, theme: { background: '#0b0f17' } });
+			term = new Terminal({
+				cursorBlink: true,
+				fontSize: 13,
+				fontFamily: "'JetBrains Mono Variable', ui-monospace, monospace",
+				theme: { background: BG, cursor: '#f97316', selectionBackground: '#f9731655' }
+			});
 			fit = new FitAddon();
 			term.loadAddon(fit);
 			term.open(el);
@@ -52,16 +59,19 @@
 			term?.dispose();
 		};
 	});
+
+	const tone = $derived(
+		status === 'connected' ? 'text-ok signal-live' : status === 'connecting' ? 'text-warn signal-live' : 'text-destructive'
+	);
 </script>
 
-<div class="muted small">{status}</div>
-<div class="term" bind:this={el}></div>
-
-<style>
-	.term {
-		height: 420px;
-		background: #0b0f17;
-		border-radius: 8px;
-		padding: 6px;
-	}
-</style>
+<div class="overflow-hidden rounded-xl border" style="background: {BG}">
+	<div class="flex items-center gap-2 border-b border-white/10 px-3 py-2 font-mono text-xs text-white/60">
+		<span class="flex gap-1.5" aria-hidden="true">
+			<span class="size-2.5 rounded-full bg-white/15"></span><span class="size-2.5 rounded-full bg-white/15"></span><span class="size-2.5 rounded-full bg-white/15"></span>
+		</span>
+		<span class="ml-2 truncate">{cmd}</span>
+		<span class="ml-auto flex items-center gap-2"><span class="signal size-1.5 {tone}"></span>{status}</span>
+	</div>
+	<div class="h-[60dvh] p-2 md:h-[440px]" bind:this={el}></div>
+</div>
