@@ -126,8 +126,13 @@ func (s *Service) CreateContainer(ctx context.Context, spec ContainerSpec) (Crea
 		netCfg.EndpointsConfig[n] = &network.EndpointSettings{}
 	}
 
+	// Always try to pull so tags like :latest are fresh, but fall back to a
+	// local copy (e.g. an image built on this host) if the pull fails.
 	if err := s.Pull(ctx, spec.Image); err != nil {
-		return Created{}, err
+		if _, ierr := s.Client.ImageInspect(ctx, spec.Image); ierr != nil {
+			return Created{}, err
+		}
+		s.Log.Warn("pull failed, using local image", "image", spec.Image, "err", err)
 	}
 
 	resp, err := s.Client.ContainerCreate(ctx,
