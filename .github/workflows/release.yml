@@ -239,7 +239,10 @@ jobs:
           body_path: NOTES.md
           generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-') }}
+          # Patterns must not overlap: a file matched twice is uploaded twice
+          # at once, and the two uploads collide. locci-* covers each archive
+          # and its .asc; SHA256SUMS* the checksums and theirs.
           files: |
             dist/locci-*
-            dist/SHA256SUMS
-            dist/*.asc
+            dist/SHA256SUMS*
+            dist/release-key.asc
