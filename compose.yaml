@@ -12,6 +12,7 @@ services:
     image: ${LOCCI_IMAGE:-locci/docker:latest}
     build: .
     restart: unless-stopped
+    stop_grace_period: 30s # time to finish running requests and a deploy job
     ports:
       - "${LOCCI_PORT:-8998}:8998"
     env_file:

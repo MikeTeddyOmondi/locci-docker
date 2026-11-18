@@ -4,6 +4,8 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -19,6 +21,11 @@ import (
 	"github.com/MikeTeddyOmondi/locci-docker/internal/tunnel"
 )
 
+// ShutdownGrace is how long `serve` waits for running requests and a running
+// deploy job after SIGINT or SIGTERM. Give the container at least this long to
+// stop (compose.yaml sets stop_grace_period).
+const ShutdownGrace = 25 * time.Second
+
 func serveCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "serve",
@@ -26,6 +33,10 @@ func serveCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg := config.Load()
 			log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+
+			// SIGINT/SIGTERM (Ctrl+C, docker stop) start a graceful shutdown.
+			ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+			defer stop()
 
 			db, err := store.Open(cfg.DatabaseURL)
 			if err != nil {
@@ -53,9 +64,12 @@ func serveCmd() *cobra.Command {
 			// One Docker connection per environment, checked every 30s for the UI.
 			envs := &env.Registry{Store: db, Box: box, DockerHost: cfg.DockerHost, Domain: cfg.TraefikDomain, Hub: &tunnel.Hub{}, Log: log}
 			defer envs.Close()
-			go envs.Run(context.Background(), 30*time.Second)
+			go envs.Run(ctx, 30*time.Second)
 
-			if cfg.RabbitMQURL != "" {
+			jobsDone := make(chan struct{})
+			if cfg.RabbitMQURL == "" {
+				close(jobsDone)
+			} else {
 				consumer := &jobs.Consumer{
 					URL:     cfg.RabbitMQURL,
 					Queue:   cfg.QueueName,
@@ -72,8 +86,9 @@ func serveCmd() *cobra.Command {
 					Log: log,
 				}
 				go func() {
+					defer close(jobsDone)
 					// Exit so the supervisor restarts us and the consumer reconnects.
-					if err := consumer.Run(context.Background()); err != nil {
+					if err := consumer.Run(ctx); err != nil && ctx.Err() == nil {
 						log.Error("deploy consumer stopped", "err", err)
 						os.Exit(1)
 					}
@@ -84,8 +99,31 @@ func serveCmd() *cobra.Command {
 			sign := &sso.Service{Store: db, Box: box, Log: log}
 
 			srv := &server.Server{Envs: envs, SSO: sign, PublicURL: cfg.PublicURL, Store: db, AuthToken: cfg.AuthToken, Log: log}
+			httpSrv := srv.HTTPServer(":"+cfg.ServerPort, cfg.GinMode)
+			served := make(chan error, 1)
+			go func() { served <- httpSrv.ListenAndServe() }()
 			log.Info("listening", "port", cfg.ServerPort, "domain", cfg.TraefikDomain)
-			return srv.Router(cfg.GinMode).Run(":" + cfg.ServerPort)
+
+			select {
+			case err := <-served:
+				return err // could not listen
+			case <-ctx.Done():
+			}
+
+			// Stop taking requests, let running ones and a running deploy job
+			// finish, but don't wait forever.
+			log.Info("shutting down")
+			grace, cancel := context.WithTimeout(context.Background(), ShutdownGrace)
+			defer cancel()
+			if err := httpSrv.Shutdown(grace); err != nil {
+				log.Warn("requests still running at shutdown", "err", err)
+			}
+			select {
+			case <-jobsDone:
+			case <-grace.Done():
+				log.Warn("deploy job still running at shutdown; RabbitMQ will redeliver it")
+			}
+			return nil
 		},
 	}
 }

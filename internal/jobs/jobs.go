@@ -103,7 +103,9 @@ func (c *Consumer) Run(ctx context.Context) error {
 			if !ok {
 				return errors.New("rabbitmq channel closed")
 			}
-			c.handle(ctx, ch, q.Name, msg)
+			// A job that has started runs to the end (or its own timeout)
+			// even when the server is shutting down; ctx only stops the loop.
+			c.handle(context.WithoutCancel(ctx), ch, q.Name, msg)
 		}
 	}
 }

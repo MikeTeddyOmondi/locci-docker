@@ -300,6 +300,18 @@ that is an API server, a web UI and a CLI.
 - `svelte-kit sync` now runs before `dev`/`build` (and on install), fixing the
   "Cannot find base config file ./.svelte-kit/tsconfig.json" warning.
 
+### Security
+
+- The HTTP server has a header read timeout, an idle timeout and a 64 KiB
+  header limit; request bodies are capped at 1 MiB (413 above that).
+- `locci serve` shuts down gracefully on SIGINT/SIGTERM: it stops taking
+  requests and waits up to 25 seconds for running ones and a running deploy
+  job (`compose.yaml` and `just up` give the container 30 seconds).
+- Every response carries a Content-Security-Policy (own scripts only, plus the
+  SvelteKit bootstrap by hash; no framing), `X-Frame-Options: DENY`,
+  `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, and HSTS
+  when served over HTTPS.
+
 ### Notes
 
 - go-libsql needs cgo: build with `CGO_ENABLED=1` on glibc.

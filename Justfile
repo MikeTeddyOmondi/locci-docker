@@ -163,7 +163,7 @@ image tag="latest":
 [group('docker')]
 up tag="latest":
     # socket = manage host containers, volume = keep the database
-    docker run -d --name {{ bin }} -p 8998:8998 \
+    docker run -d --name {{ bin }} -p 8998:8998 --stop-timeout 30 \
       -v /var/run/docker.sock:/var/run/docker.sock \
       -v locci-data:/data \
       --env-file .env \

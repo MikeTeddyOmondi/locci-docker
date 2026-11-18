@@ -30,7 +30,7 @@ type Server struct {
 func (s *Server) Router(mode string) *gin.Engine {
 	gin.SetMode(mode)
 	r := gin.New()
-	r.Use(s.logRequests, gin.Recovery())
+	r.Use(s.logRequests, gin.Recovery(), s.securityHeaders(), limitBody)
 
 	r.GET("/health", s.health)
 	r.POST("/api/v1/auth/login", s.login)
@@ -159,6 +159,9 @@ func (s *Server) health(c *gin.Context) {
 
 // fail writes an error response and logs server-side errors.
 func (s *Server) fail(c *gin.Context, code int, err error) {
+	if bodyTooLarge(err) {
+		code = http.StatusRequestEntityTooLarge
+	}
 	if code >= 500 {
 		s.Log.Error("request failed", "path", c.FullPath(), "err", err)
 	}

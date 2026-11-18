@@ -4,10 +4,13 @@
 package ui
 
 import (
+	"crypto/sha256"
 	"embed"
+	"encoding/base64"
 	"io/fs"
 	"net/http"
 	"path"
+	"regexp"
 	"strings"
 )
 
@@ -18,6 +21,23 @@ const notBuilt = `<!doctype html><title>locci</title>
 <body style="font-family:system-ui;padding:3rem">
 <h1>locci</h1><p>The web UI isn't built into this binary.
 Run <code>just web</code> and rebuild, or use the CLI / API.</p></body>`
+
+var inlineScript = regexp.MustCompile(`(?s)<script>(.*?)</script>`)
+
+// InlineScriptHashes returns " 'sha256-...'" for each inline script in
+// index.html (SvelteKit's bootstrap), for the Content-Security-Policy.
+func InlineScriptHashes() string {
+	index, err := fs.ReadFile(dist, "dist/index.html")
+	if err != nil {
+		return ""
+	}
+	var out strings.Builder
+	for _, m := range inlineScript.FindAllSubmatch(index, -1) {
+		sum := sha256.Sum256(m[1])
+		out.WriteString(" 'sha256-" + base64.StdEncoding.EncodeToString(sum[:]) + "'")
+	}
+	return out.String()
+}
 
 // Handler serves static files and falls back to index.html for client-side routes.
 func Handler() http.Handler {
