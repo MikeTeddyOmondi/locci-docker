@@ -31,7 +31,7 @@ repository's [`compose.yaml`](compose.yaml) (see [docs/DOCKER.md](docs/DOCKER.md
 ```yaml
 services:
   locci:
-    image: locci/docker:latest   # from `just image tag=latest`
+    image: locci/docker:latest
     restart: unless-stopped
     ports: ["8998:8998"]
     env_file: .env
