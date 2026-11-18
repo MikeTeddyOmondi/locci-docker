@@ -101,6 +101,9 @@ func (s *Service) TraefikLabels(subdomain, port string) map[string]string {
 
 // CreateContainer pulls the image, then creates (but does not start) the container.
 func (s *Service) CreateContainer(ctx context.Context, spec ContainerSpec) (Created, error) {
+	if err := CheckSubdomain(spec.Subdomain); err != nil {
+		return Created{}, err
+	}
 	exposed := nat.PortSet{}
 	bindings := nat.PortMap{}
 	mainPort := ""

@@ -16,6 +16,7 @@ win over it. Copy [`.env.sample`](../.env.sample) to start.
 | `LOCCI_PUBLIC_URL` | empty | The address people open locci at, such as `https://locci.example.com`. Used for OIDC redirect URIs; without it they come from each request (`X-Forwarded-*` aware) |
 | `LOCCI_TRUSTED_PROXIES` | loopback and private networks | Reverse proxies whose `X-Forwarded-For`, `-Proto` and `-Host` headers are believed: comma separated IPs or CIDRs, `*` for any, `none` for no proxy. Headers from other clients are ignored |
 | `LOCCI_TOKEN_TTL_DAYS` | `30` | Days a sign-in (API token) stays valid without use; each use pushes the expiry back. `0` means tokens never expire |
+| `LOCCI_USER_HOST_ACCESS` | `false` | `true` lets plain users mount host paths, set Traefik labels and touch protected containers, as admins can. See [SECURITY.md](SECURITY.md#what-locci-can-do) |
 | `DOCKER_HOST` | empty | Docker daemon for the `local` environment. Empty means the local socket. `DOCKER_TLS_VERIFY` and `DOCKER_CERT_PATH` are honoured too |
 | `TRAEFIK_DOMAIN` | `locci.cloud` | Base domain for the Traefik labels put on created containers (`<subdomain>.<domain>`) |
 

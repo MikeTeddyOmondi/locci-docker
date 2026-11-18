@@ -22,6 +22,7 @@ type Config struct {
 	PublicURL        string // LOCCI_PUBLIC_URL, e.g. https://locci.example.com (OIDC redirect URIs)
 	TrustedProxies   string // LOCCI_TRUSTED_PROXIES; empty = loopback and private networks
 	TokenTTLDays     int    // LOCCI_TOKEN_TTL_DAYS: token lifetime after last use; 0 = never expire
+	UserHostAccess   bool   // LOCCI_USER_HOST_ACCESS: plain users may mount host paths and touch any container
 }
 
 // Load reads .env if present, then the process environment.
@@ -42,6 +43,7 @@ func Load() Config {
 		PublicURL:        os.Getenv("LOCCI_PUBLIC_URL"),
 		TrustedProxies:   os.Getenv("LOCCI_TRUSTED_PROXIES"),
 		TokenTTLDays:     getInt("LOCCI_TOKEN_TTL_DAYS", 30),
+		UserHostAccess:   os.Getenv("LOCCI_USER_HOST_ACCESS") == "true",
 	}
 }
 

@@ -327,6 +327,17 @@ that is an API server, a web UI and a CLI.
   their 30 days at the upgrade. `GET /auth/tokens` and
   `DELETE /auth/tokens/:id`, `locci sessions [revoke ID]` and a Sessions
   dialog in the web UI's user menu list and sign out your own sessions.
+- Plain users can no longer reach the hosts through Docker: new containers
+  get named volumes only (no host paths), `traefik.*` and `io.locci.*` labels
+  are admin-only, a subdomain another container routes can't be taken, and
+  protected containers (labelled `io.locci.protected=true`, privileged, or
+  with the Docker socket or `/` mounted) can't be changed or opened in a
+  console, and their environment is hidden when inspected. The image carries
+  the label, so the server and agents are protected. Admins are not limited;
+  `LOCCI_USER_HOST_ACCESS=true` restores the old behaviour for everyone.
+- A container's subdomain must be one DNS label (lowercase letters, digits,
+  dashes): it is part of Traefik's label keys, where a dot or backtick could
+  change other routes.
 
 ### Notes
 

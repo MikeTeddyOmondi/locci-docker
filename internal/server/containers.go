@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -26,6 +27,15 @@ func (s *Server) createContainer(c *gin.Context) {
 		return
 	}
 
+	if err := docker.CheckSubdomain(spec.Subdomain); err != nil {
+		s.fail(c, http.StatusBadRequest, err)
+		return
+	}
+	if code, err := s.checkSpec(c, spec); err != nil {
+		s.fail(c, code, err)
+		return
+	}
+
 	created, err := dk(c).CreateContainer(c.Request.Context(), spec)
 	if err != nil {
 		s.fail(c, http.StatusInternalServerError, err)
@@ -39,6 +49,14 @@ func (s *Server) inspectContainer(c *gin.Context) {
 	if err != nil {
 		s.fail(c, statusFor(err), err)
 		return
+	}
+	// A protected container's environment holds the host's secrets (for
+	// locci itself: LOCCI_SECRET_KEY, AUTH_TOKEN); plain users don't see it.
+	if s.restricted(c) && info.Config != nil && docker.ProtectedReason(info) != "" {
+		for i, e := range info.Config.Env {
+			name, _, _ := strings.Cut(e, "=")
+			info.Config.Env[i] = name + "=(hidden)"
+		}
 	}
 	c.JSON(http.StatusOK, info)
 }
@@ -131,6 +149,9 @@ func (s *Server) startContainerLegacy(c *gin.Context) {
 		s.fail(c, http.StatusBadRequest, err)
 		return
 	}
+	if !s.allowContainer(c, req.ContainerID) {
+		return
+	}
 	if err := dk(c).StartContainer(c.Request.Context(), req.ContainerID); err != nil {
 		s.fail(c, statusFor(err), err)
 		return
@@ -145,6 +166,9 @@ func (s *Server) deleteContainerLegacy(c *gin.Context) {
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		s.fail(c, http.StatusBadRequest, err)
+		return
+	}
+	if !s.allowContainer(c, req.ContainerID) {
 		return
 	}
 	if err := dk(c).RemoveContainer(c.Request.Context(), req.ContainerID, req.Force); err != nil {

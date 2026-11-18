@@ -20,6 +20,8 @@ FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY --from=build /out/locci /usr/local/bin/locci
 ENV DATABASE_URL=file:/data/locci.db GIN_MODE=release
+# Only admins may change or open a console in the server and agent containers.
+LABEL io.locci.protected="true"
 VOLUME /data
 EXPOSE 8998
 ENTRYPOINT ["locci"]

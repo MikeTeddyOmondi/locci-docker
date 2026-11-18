@@ -71,10 +71,11 @@ It needs no ports and no volume.
 
 ## Things to know
 
-- **The Docker socket is root on the host.** Anyone who can log in to locci
-  as a user can run containers there. Put locci behind HTTPS (a reverse proxy
-  such as Traefik or Caddy), keep strong passwords, and see
-  [SECURITY.md](SECURITY.md).
+- **The Docker socket is root on the host.** Admins can use all of it; plain
+  users can run containers but can't mount host paths or open a console in
+  locci's own container (the image is labelled `io.locci.protected=true`).
+  Put locci behind HTTPS (a reverse proxy such as Traefik or Caddy), keep
+  strong passwords, and see [SECURITY.md](SECURITY.md).
 - **Without the socket** the `local` environment is `down`, but locci still
   works as a manager of remote environments over TLS or SSH. SSH needs no
   `ssh` client in the image; locci has its own.

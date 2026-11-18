@@ -103,7 +103,7 @@ func serveCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			srv := &server.Server{Envs: envs, SSO: sign, PublicURL: cfg.PublicURL, Store: db, AuthToken: cfg.AuthToken, Log: log, TrustedProxies: proxies}
+			srv := &server.Server{Envs: envs, SSO: sign, PublicURL: cfg.PublicURL, Store: db, AuthToken: cfg.AuthToken, Log: log, TrustedProxies: proxies, UserHostAccess: cfg.UserHostAccess}
 			httpSrv := srv.HTTPServer(":"+cfg.ServerPort, cfg.GinMode)
 			served := make(chan error, 1)
 			go func() { served <- httpSrv.ListenAndServe() }()

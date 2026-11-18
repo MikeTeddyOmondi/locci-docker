@@ -31,6 +31,10 @@ type Server struct {
 	// X-Forwarded-For/-Proto/-Host. nil means DefaultProxies.
 	TrustedProxies []string
 
+	// UserHostAccess (LOCCI_USER_HOST_ACCESS) lifts the plain-user limits in
+	// policy.go: every user may mount host paths and touch any container.
+	UserHostAccess bool
+
 	proxyOnce sync.Once
 	proxyNets []*net.IPNet
 	limitOnce sync.Once
@@ -130,14 +134,14 @@ func (s *Server) resourceRoutes(g *gin.RouterGroup) {
 	g.GET("/containers", s.listContainers)
 	g.POST("/containers", s.createContainer)
 	g.GET("/containers/:id", s.inspectContainer)
-	g.DELETE("/containers/:id", s.removeContainer)
+	g.DELETE("/containers/:id", s.guardContainer, s.removeContainer)
 	for _, action := range docker.Actions {
-		g.POST("/containers/:id/"+action, s.containerAction(action))
+		g.POST("/containers/:id/"+action, s.guardContainer, s.containerAction(action))
 	}
 	g.GET("/containers/:id/logs", s.containerLogs)
 	g.GET("/containers/:id/stats", s.containerStats)
-	g.POST("/containers/:id/exec", s.containerExec)
-	g.GET("/containers/:id/exec/ws", s.execWS)
+	g.POST("/containers/:id/exec", s.guardContainer, s.containerExec)
+	g.GET("/containers/:id/exec/ws", s.guardContainer, s.execWS)
 
 	// Images
 	g.GET("/images", s.listImages)
