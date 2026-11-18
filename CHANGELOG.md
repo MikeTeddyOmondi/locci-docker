@@ -163,6 +163,12 @@ that is an API server, a web UI and a CLI.
     this kind report `agent_connected` live, and requests while no agent is
     connected say so instead of a generic Docker error (custom dialers now
     report their real error, as SSH already did).
+    CLI: `locci agent --server URL` (token from `LOCCI_AGENT_TOKEN`, so it
+    stays out of process lists) dials out, serves the local Docker
+    (`--docker-host`, default `DOCKER_HOST` or the local socket), reconnects
+    with backoff and stops for good when its token is refused.
+    `locci env add NAME --kind agent` prints the token and the commands to
+    start the agent; `locci env edit NAME --rotate-agent-token` replaces it.
 
 - **Single sign-on with OIDC (in progress).**
   - Tables `oidc_providers` (client secret encrypted like environment keys),

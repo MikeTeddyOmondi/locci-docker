@@ -11,16 +11,27 @@ import (
 	"github.com/MikeTeddyOmondi/locci-docker/internal/client"
 )
 
+// printAgentSetup shows a new agent token (once) and how to start the agent.
+func printAgentSetup(server, token string) {
+	fmt.Printf("\nagent token (shown once): %s\n\non the Docker host, run:\n", token)
+	fmt.Printf("  LOCCI_AGENT_TOKEN=%s locci agent --server %s\n", token, server)
+	fmt.Printf("or in Docker:\n  docker run -d --name locci-agent --restart unless-stopped \\\n")
+	fmt.Printf("    -v /var/run/docker.sock:/var/run/docker.sock -e LOCCI_AGENT_TOKEN=%s \\\n", token)
+	fmt.Printf("    <locci image> agent --server %s\n", server)
+}
+
 type envInfo struct {
-	Name        string `json:"name"`
-	Label       string `json:"label"`
-	Kind        string `json:"kind"`
-	URL         string `json:"url"`
-	Status      string `json:"status"`
-	IsDefault   bool   `json:"is_default"`
-	LastSeenAt  string `json:"last_seen_at"`
-	HasSecret   bool   `json:"has_secret"`
-	Fingerprint string `json:"ssh_fingerprint"`
+	Name           string `json:"name"`
+	Label          string `json:"label"`
+	Kind           string `json:"kind"`
+	URL            string `json:"url"`
+	Status         string `json:"status"`
+	IsDefault      bool   `json:"is_default"`
+	LastSeenAt     string `json:"last_seen_at"`
+	HasSecret      bool   `json:"has_secret"`
+	Fingerprint    string `json:"ssh_fingerprint"`
+	AgentConnected *bool  `json:"agent_connected"`
+	AgentToken     string `json:"agent_token"`
 }
 
 type hostInfo struct {
@@ -114,7 +125,7 @@ func envAddCmd() *cobra.Command {
 			}
 
 			c := api()
-			if !noTest {
+			if !noTest && kind != "agent" { // an agent can only be seen once it connects
 				var res struct {
 					OK    bool     `json:"ok"`
 					Error string   `json:"error"`
@@ -141,11 +152,14 @@ func envAddCmd() *cobra.Command {
 				return printJSON(saved)
 			}
 			fmt.Printf("added %s (%s). Use it with `locci env use %s` or `-E %s`.\n", saved.Name, saved.Kind, saved.Name, saved.Name)
+			if saved.AgentToken != "" {
+				printAgentSetup(c.URL, saved.AgentToken)
+			}
 			return nil
 		},
 	}
 	f := cmd.Flags()
-	f.StringVar(&kind, "kind", "ssh", "connection kind: local, tcp+tls or ssh")
+	f.StringVar(&kind, "kind", "ssh", "connection kind: local, tcp+tls, ssh or agent (the host dials out with locci agent)")
 	f.StringVar(&rawURL, "url", "", "tcp://host:2376 (tcp+tls), ssh://user@host[:port][/socket] (ssh); empty for local means DOCKER_HOST or the local socket")
 	f.StringVar(&label, "label", "", "display name (default: NAME)")
 	f.StringVar(&tlsCA, "tls-ca", "", "CA certificate file (tcp+tls)")
@@ -158,7 +172,7 @@ func envAddCmd() *cobra.Command {
 
 func envEditCmd() *cobra.Command {
 	var label, rawURL, tlsCA, tlsCert, tlsKey, sshKey string
-	var resetHostKey, noTest bool
+	var resetHostKey, noTest, rotate bool
 	cmd := &cobra.Command{
 		Use:   "edit NAME",
 		Short: "Change an environment (admin); only the flags given change, keys stay unless replaced",
@@ -194,9 +208,12 @@ func envEditCmd() *cobra.Command {
 			if resetHostKey {
 				body["reset_host_key"] = true
 			}
+			if rotate {
+				body["rotate_agent_token"] = true
+			}
 
 			// Test the merged settings; blank keys are taken from the stored environment.
-			if !noTest {
+			if !noTest && cur.Kind != "agent" {
 				var res struct {
 					OK    bool     `json:"ok"`
 					Error string   `json:"error"`
@@ -222,6 +239,10 @@ func envEditCmd() *cobra.Command {
 				return printJSON(saved)
 			}
 			fmt.Printf("saved %s (%s)\n", saved.Name, saved.Label)
+			if saved.AgentToken != "" {
+				fmt.Println("the agent using the old token was disconnected")
+				printAgentSetup(c.URL, saved.AgentToken)
+			}
 			return nil
 		},
 	}
@@ -233,6 +254,7 @@ func envEditCmd() *cobra.Command {
 	f.StringVar(&tlsKey, "tls-key", "", "replace the client key (file)")
 	f.StringVar(&sshKey, "ssh-key", "", "replace the SSH private key (file)")
 	f.BoolVar(&resetHostKey, "reset-host-key", false, "forget the pinned SSH host key and pin the one seen now")
+	f.BoolVar(&rotate, "rotate-agent-token", false, "agent environments: issue a new token (disconnects the running agent)")
 	f.BoolVar(&noTest, "no-test", false, "save without testing the connection first")
 	return cmd
 }
