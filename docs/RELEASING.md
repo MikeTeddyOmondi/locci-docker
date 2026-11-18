@@ -27,9 +27,11 @@ Set these in the repository's settings (Secrets and variables, Actions):
 The image signature and the provenance attestations need no secret: they use
 the workflow's own GitHub identity through Sigstore (keyless).
 
-Publish the public half of the GPG key where users can find it, for example
-as `KEYS` in the repository or on a keyserver:
-`gpg --armor --export KEYID > KEYS`.
+The public half of the GPG key is committed as `docs/release-key.asc`; the
+workflow attaches it to each release and checks every signature against it,
+so a release fails if the secret key and the published key don't match.
+After changing the key, export it again:
+`gpg --armor --export KEYID > docs/release-key.asc`.
 
 ## Cutting a release
 
@@ -52,12 +54,40 @@ as `KEYS` in the repository or on a keyserver:
 them all and is signed too, and GitHub holds a build provenance attestation
 for every archive.
 
+The signing key is "Locci Release Signing" `<admin@locci.cloud>`, with this
+fingerprint:
+
+```
+2B9D 1A57 F9B7 7E2E EDFF  0F05 B5E0 0DB4 AAE7 15C3
+```
+
+Its public half is [`docs/release-key.asc`](release-key.asc) in this
+repository, and every release carries the same file as `release-key.asc`.
+Import it once and check the fingerprint matches the one above:
+
 ```sh
-gpg --import KEYS
-gpg --verify SHA256SUMS.asc SHA256SUMS
-sha256sum -c SHA256SUMS --ignore-missing
+gpg --import release-key.asc
+gpg --fingerprint B5E00DB4AAE715C3
+```
+
+Then verify a download:
+
+```sh
+gpg --verify SHA256SUMS.asc SHA256SUMS          # the checksums are ours
+sha256sum -c SHA256SUMS --ignore-missing        # and match your download
+# or one archive directly:
+gpg --verify locci-v0.2.0-linux-amd64.tar.gz.asc locci-v0.2.0-linux-amd64.tar.gz
 gh attestation verify locci-v0.2.0-linux-amd64.tar.gz --repo MikeTeddyOmondi/locci-docker
 ```
+
+gpg reports "Good signature" and, until you certify the key yourself, a
+warning that it isn't certified with a trusted signature. That warning is
+normal; the fingerprint check above is what establishes trust.
+
+The key expires on 2028-08-18. Before then, extend it
+(`gpg --quick-set-expire B5E00DB4AAE715C3 2y`), export the public key again
+to `docs/release-key.asc`, and update the `RELEASE_GPG_KEY` secret. A new key
+means a new fingerprint here too.
 
 **Image.** It is signed with cosign (keyless) by digest, and carries a
 provenance attestation and an SBOM.

@@ -160,6 +160,11 @@ jobs:
         working-directory: dist
         run: sha256sum locci-* > SHA256SUMS && cat SHA256SUMS
 
+      # The public key users verify with, from the repository (uploaded with
+      # the other .asc files). The signing step fails if the key doesn't match.
+      - name: Public key
+        run: cp docs/release-key.asc dist/release-key.asc
+
       # A checksum beside a file only proves it wasn't corrupted; anyone who can
       # replace the archive can replace its checksum. The GPG signatures and
       # the provenance attestation prove this workflow produced them.
@@ -179,6 +184,12 @@ jobs:
           for f in locci-* SHA256SUMS; do
             echo "$GPG_PASSPHRASE" | gpg --batch --yes --passphrase-fd 0 \
               --pinentry-mode loopback --detach-sign --armor "$f"
+          done
+          # Check against the published public key alone, as users will.
+          mkdir -m 700 "$RUNNER_TEMP/verify"
+          gpg --homedir "$RUNNER_TEMP/verify" --batch --import release-key.asc
+          for f in locci-* SHA256SUMS; do
+            gpg --homedir "$RUNNER_TEMP/verify" --batch --verify "$f.asc" "$f"
           done
 
       - uses: actions/attest-build-provenance@v2
@@ -208,9 +219,14 @@ jobs:
 
           ### Verify a download
 
+          Signing key: \`release-key.asc\` below, fingerprint
+          \`2B9D 1A57 F9B7 7E2E EDFF  0F05 B5E0 0DB4 AAE7 15C3\`
+          (also in docs/RELEASING.md).
+
           \`\`\`sh
-          sha256sum -c SHA256SUMS --ignore-missing
+          gpg --import release-key.asc
           gpg --verify SHA256SUMS.asc SHA256SUMS
+          sha256sum -c SHA256SUMS --ignore-missing
           gh attestation verify locci-${GITHUB_REF_NAME}-linux-amd64.tar.gz --repo ${GITHUB_REPOSITORY}
           \`\`\`
           EOF

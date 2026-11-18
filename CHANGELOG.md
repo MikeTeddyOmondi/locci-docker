@@ -12,6 +12,10 @@ that is an API server, a web UI and a CLI.
 
 ### Added
 
+- **Published release key.** `docs/release-key.asc` is the public key that
+  signs the release binaries (fingerprint in `docs/RELEASING.md`); each
+  release attaches it, and the workflow checks every signature against it
+  before publishing.
 - **Compose profiles for Keycloak and Pocket ID.** `just compose-up keycloak`
   (or `pocket-id`) starts a provider next to locci in production mode
   (Keycloak with PostgreSQL); missing secrets stop it with a message. They
