@@ -94,9 +94,9 @@ func TestAuthFlow(t *testing.T) {
 	if code, out := call(t, "GET", ts.URL+"/api/v1/auth/me", tok, nil); code != 200 || out["username"] != "ann" {
 		t.Fatalf("me: %d %v", code, out)
 	}
-	// ?token= works too (used by the WebSocket terminal)
-	if code, _ := call(t, "GET", ts.URL+"/api/v1/auth/me?token="+tok, "", nil); code != 200 {
-		t.Fatalf("query token: got %d", code)
+	// ?token= is only for WebSockets (see TestQueryTokenOnlyForWebSockets)
+	if code, _ := call(t, "GET", ts.URL+"/api/v1/auth/me?token="+tok, "", nil); code != 401 {
+		t.Fatalf("query token on a plain request: got %d", code)
 	}
 	// non-admins can't manage users
 	if code, _ := call(t, "GET", ts.URL+"/api/v1/users", tok, nil); code != 403 {

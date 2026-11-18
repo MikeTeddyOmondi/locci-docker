@@ -311,6 +311,13 @@ that is an API server, a web UI and a CLI.
   SvelteKit bootstrap by hash; no framing), `X-Frame-Options: DENY`,
   `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, and HSTS
   when served over HTTPS.
+- `X-Forwarded-For`, `-Proto` and `-Host` count only from trusted proxies
+  (`LOCCI_TRUSTED_PROXIES`, default loopback and private networks), so a
+  client can't forge its IP in logs or the scheme and host of OIDC redirects.
+- `?token=` is accepted only on WebSocket requests (the console); other URLs
+  no longer carry tokens into browser history and proxy logs.
+- `AUTH_TOKEN` is compared in constant time, and a login for an unknown user
+  takes as long as a wrong password, so timing doesn't reveal usernames.
 
 ### Notes
 

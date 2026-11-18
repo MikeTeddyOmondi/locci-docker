@@ -1,12 +1,14 @@
 package server
 
 import (
+	"crypto/subtle"
 	"errors"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
 
 	"github.com/MikeTeddyOmondi/locci-docker/internal/store"
 )
@@ -21,10 +23,12 @@ func currentUser(c *gin.Context) store.User {
 }
 
 // auth accepts the static AUTH_TOKEN or a user API token, from the
-// Authorization header or (for WebSockets, which can't set headers) ?token=.
+// Authorization header or, for WebSockets (which can't set headers), ?token=.
 func (s *Server) auth(c *gin.Context) {
 	token, _ := strings.CutPrefix(c.GetHeader("Authorization"), "Bearer ")
-	if token == "" {
+	if token == "" && websocket.IsWebSocketUpgrade(c.Request) {
+		// Only WebSockets: a token in any other URL ends up in browser
+		// history and proxy access logs.
 		token = c.Query("token")
 	}
 	if token == "" {
@@ -32,7 +36,7 @@ func (s *Server) auth(c *gin.Context) {
 		return
 	}
 
-	if s.AuthToken != "" && token == s.AuthToken {
+	if s.AuthToken != "" && subtle.ConstantTimeCompare([]byte(token), []byte(s.AuthToken)) == 1 {
 		c.Set("user", systemUser)
 		c.Next()
 		return

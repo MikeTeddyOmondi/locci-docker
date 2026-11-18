@@ -98,7 +98,11 @@ func serveCmd() *cobra.Command {
 			// OIDC sign-in uses the same key for client secrets and its flow cookie.
 			sign := &sso.Service{Store: db, Box: box, Log: log}
 
-			srv := &server.Server{Envs: envs, SSO: sign, PublicURL: cfg.PublicURL, Store: db, AuthToken: cfg.AuthToken, Log: log}
+			proxies, err := server.ParseProxies(cfg.TrustedProxies)
+			if err != nil {
+				return err
+			}
+			srv := &server.Server{Envs: envs, SSO: sign, PublicURL: cfg.PublicURL, Store: db, AuthToken: cfg.AuthToken, Log: log, TrustedProxies: proxies}
 			httpSrv := srv.HTTPServer(":"+cfg.ServerPort, cfg.GinMode)
 			served := make(chan error, 1)
 			go func() { served <- httpSrv.ListenAndServe() }()

@@ -3,8 +3,10 @@ package server
 
 import (
 	"log/slog"
+	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	cerrdefs "github.com/containerd/errdefs"
@@ -24,12 +26,26 @@ type Server struct {
 	Store     *store.Store
 	AuthToken string // optional static admin token (AUTH_TOKEN)
 	Log       *slog.Logger
+
+	// TrustedProxies (LOCCI_TRUSTED_PROXIES, see ParseProxies) may set
+	// X-Forwarded-For/-Proto/-Host. nil means DefaultProxies.
+	TrustedProxies []string
+
+	proxyOnce sync.Once
+	proxyNets []*net.IPNet
 }
 
 // Router builds the gin engine with every route.
 func (s *Server) Router(mode string) *gin.Engine {
 	gin.SetMode(mode)
 	r := gin.New()
+	// c.ClientIP() believes X-Forwarded-For only from trusted proxies.
+	nets := s.proxies()
+	cidrs := make([]string, len(nets))
+	for i, n := range nets {
+		cidrs[i] = n.String()
+	}
+	_ = r.SetTrustedProxies(cidrs)
 	r.Use(s.logRequests, gin.Recovery(), s.securityHeaders(), limitBody)
 
 	r.GET("/health", s.health)

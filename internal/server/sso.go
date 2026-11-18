@@ -19,7 +19,7 @@ import (
 const ssoCookie = "locci_sso"
 
 // baseURL is where browsers reach this server: LOCCI_PUBLIC_URL, or the
-// request's scheme and host (honouring X-Forwarded-* from a reverse proxy).
+// request's scheme and host (honouring X-Forwarded-* from a trusted proxy).
 func (s *Server) baseURL(c *gin.Context) string {
 	if s.PublicURL != "" {
 		return strings.TrimRight(s.PublicURL, "/")
@@ -28,12 +28,15 @@ func (s *Server) baseURL(c *gin.Context) string {
 	if c.Request.TLS != nil {
 		scheme = "https"
 	}
-	if p := c.GetHeader("X-Forwarded-Proto"); p != "" {
-		scheme = strings.TrimSpace(strings.Split(p, ",")[0])
-	}
 	host := c.Request.Host
-	if h := c.GetHeader("X-Forwarded-Host"); h != "" {
-		host = strings.TrimSpace(strings.Split(h, ",")[0])
+	// Only a trusted reverse proxy may say what the public scheme and host are.
+	if s.fromTrustedProxy(c) {
+		if p := c.GetHeader("X-Forwarded-Proto"); p != "" {
+			scheme = strings.TrimSpace(strings.Split(p, ",")[0])
+		}
+		if h := c.GetHeader("X-Forwarded-Host"); h != "" {
+			host = strings.TrimSpace(strings.Split(h, ",")[0])
+		}
 	}
 	return scheme + "://" + host
 }

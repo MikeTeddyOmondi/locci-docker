@@ -20,6 +20,7 @@ type Config struct {
 	DatabaseURL      string
 	SecretKey        string // LOCCI_SECRET_KEY, base64 32 bytes (internal/secret)
 	PublicURL        string // LOCCI_PUBLIC_URL, e.g. https://locci.example.com (OIDC redirect URIs)
+	TrustedProxies   string // LOCCI_TRUSTED_PROXIES; empty = loopback and private networks
 }
 
 // Load reads .env if present, then the process environment.
@@ -38,6 +39,7 @@ func Load() Config {
 		DatabaseURL:      get("DATABASE_URL", "file:locci.db"),
 		SecretKey:        os.Getenv("LOCCI_SECRET_KEY"),
 		PublicURL:        os.Getenv("LOCCI_PUBLIC_URL"),
+		TrustedProxies:   os.Getenv("LOCCI_TRUSTED_PROXIES"),
 	}
 }
 

@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 
 	_ "github.com/tursodatabase/go-libsql"
 	"golang.org/x/crypto/bcrypt"
@@ -254,10 +255,22 @@ func (s *Store) SetPassword(username, password string) error {
 }
 
 // CheckPassword returns the user when the password matches.
+// dummyHash is a bcrypt hash of a random password, compared against when the
+// user doesn't exist.
+var dummyHash = sync.OnceValue(func() []byte {
+	b := make([]byte, 16)
+	rand.Read(b)
+	h, _ := bcrypt.GenerateFromPassword(b, bcrypt.DefaultCost)
+	return h
+})
+
 func (s *Store) CheckPassword(username, password string) (User, error) {
 	var hash string
 	err := s.DB.QueryRow(`SELECT password_hash FROM users WHERE username = ?`, username).Scan(&hash)
 	if err != nil || hash == "" { // "" = SSO-only user: no password to match
+		// Spend the same bcrypt time as a real check, so response times
+		// don't tell which usernames exist.
+		bcrypt.CompareHashAndPassword(dummyHash(), []byte(password))
 		return User{}, ErrNotFound
 	}
 	if bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) != nil {
