@@ -258,9 +258,49 @@ that is an API server, a web UI and a CLI.
     ID, Zitadel and GitLab, with scripted setups where the provider has a
     CLI or API for it (Entra via `az`, GitLab via its API). They follow each
     provider's documentation and say so; they weren't tested end to end.
+- GitHub Actions: CI (gofmt, vet, tests, govulncheck with an explained
+  ignore list, the web UI check and build, a multi-arch image build) and a
+  tag-triggered release with GPG-signed binaries for Linux, macOS and Windows
+  (amd64, arm64), `SHA256SUMS`, build provenance attestations, and the
+  multi-arch image on Docker Hub signed with cosign (keyless) plus provenance
+  and an SBOM. See `docs/RELEASING.md`.
+- Works behind reverse proxies and tunnels: `LOCCI_PUBLIC_URL` decides the
+  redirect URIs, the cookie's `Secure` flag, HSTS and the console's origin
+  check; the console accepts the public host from it or from a trusted
+  `X-Forwarded-Host` when the proxy rewrites `Host`; the console pings every
+  30 seconds so proxies don't close it; log streams send
+  `X-Accel-Buffering: no`; `100.64.0.0/10` (NetBird, Tailscale) is trusted
+  by default. New guide: `docs/REVERSE_PROXY.md`.
+- `AGENTS.md`: how the code is laid out, the commands, what to check before a
+  change is done, and the project's rules, for coding agents and people.
+- Per-environment access: an admin can limit an environment to chosen users
+  (or admins only) with `PUT /environments/:env/access`,
+  `locci env access NAME --users ann,bob | --admins-only | --everyone`, or
+  Access in the Environments page menu. Others don't see it in lists and get
+  404 on its routes (403 on the original routes when it's the default).
+  Environments stay open to everyone until restricted, and removing the last
+  listed user leaves one admin-only rather than open.
 
 ### Changed
 
+- Go 1.27.4 and every dependency on its latest release (gin 1.12,
+  go-oidc 3.21, x/crypto 0.59, x/net 0.63, docker client 28.5.2, ...).
+  govulncheck finds nothing reachable outside the Docker client module,
+  whose remaining advisories are daemon-side with no client fix.
+- SQLite is now pure Go (`modernc.org/sqlite`) for `file:` databases, and
+  remote libsql/Turso URLs use `libsql-client-go`. go-libsql's prebuilt
+  libraries contain LTO bitcode, which patched Go releases refuse to link.
+  The binary is static (`CGO_ENABLED=0`), existing database files open
+  unchanged, and the Dockerfile cross-compiles per platform instead of
+  emulating. `locci --version` reports the build's version.
+- The image is 41 MB instead of 186 MB: a static binary on Debian slim, with
+  no package installs in the final stage.
+- Container actions live in one options menu (list rows, cards and the
+  container page) instead of a Stop/Start button beside it; the menu lists
+  what fits the state and shows a spinner while an action runs. For plain
+  users the container list and details carry `LocciLocked` (why a protected
+  container is admin-only): the menu says so instead of offering actions,
+  and the Console tab is hidden.
 - The Docker image is now `locci/docker` (Justfile `image`), and the docs, the
   agent setup dialog and `locci env add --kind agent` use that name.
 - Code split from `cmd/main.go` into internal packages: `cli`, `client`,
@@ -279,6 +319,10 @@ that is an API server, a web UI and a CLI.
 
 ### Fixed
 
+- An agent environment showed as `down` for up to 30 seconds after its
+  agent connected (the status check ran before the tunnel was registered);
+  it is `up` right away now, and `locci env ls` labels agents
+  "(outbound agent)" instead of "(local socket)".
 - `just up` passed `.env` into the container unchanged, so a host-style
   `DATABASE_URL=file:locci.db` put the database outside the `/data` volume and
   a host `DOCKER_HOST` (such as a Colima socket path) left `local` down. It
@@ -337,24 +381,6 @@ that is an API server, a web UI and a CLI.
   console, and their environment is hidden when inspected. The image carries
   the label, so the server and agents are protected. Admins are not limited;
   `LOCCI_USER_HOST_ACCESS=true` restores the old behaviour for everyone.
-- Go 1.27.4 and every dependency on its latest release (gin 1.12,
-  go-oidc 3.21, x/crypto 0.59, x/net 0.63, docker client 28.5.2, ...).
-  govulncheck finds nothing reachable outside the Docker client module,
-  whose remaining advisories are daemon-side with no client fix.
-- GitHub Actions: CI (gofmt, vet, tests, govulncheck with an explained
-  ignore list, the web UI check and build, a multi-arch image build) and a
-  tag-triggered release with GPG-signed binaries for Linux, macOS and Windows
-  (amd64, arm64), `SHA256SUMS`, build provenance attestations, and the
-  multi-arch image on Docker Hub signed with cosign (keyless) plus provenance
-  and an SBOM. See `docs/RELEASING.md`.
-- The image is 41 MB instead of 186 MB: a static binary on Debian slim, with
-  no package installs in the final stage.
-- SQLite is now pure Go (`modernc.org/sqlite`) for `file:` databases, and
-  remote libsql/Turso URLs use `libsql-client-go`. go-libsql's prebuilt
-  libraries contain LTO bitcode, which patched Go releases refuse to link.
-  The binary is static (`CGO_ENABLED=0`), existing database files open
-  unchanged, and the Dockerfile cross-compiles per platform instead of
-  emulating. `locci --version` reports the build's version.
 - The web UI's sign-in is an HttpOnly session cookie instead of a token in
   local storage, so page scripts can't read it. Requests that change
   something need an `X-Locci-CSRF` header alongside the cookie; the CLI and
@@ -362,26 +388,6 @@ that is an API server, a web UI and a CLI.
   into the cookie once (`POST /auth/session`), so nobody is signed out.
   Single sign-on in the browser sets the cookie instead of returning the
   token in the URL fragment.
-- Works behind reverse proxies and tunnels: `LOCCI_PUBLIC_URL` decides the
-  redirect URIs, the cookie's `Secure` flag, HSTS and the console's origin
-  check; the console accepts the public host from it or from a trusted
-  `X-Forwarded-Host` when the proxy rewrites `Host`; the console pings every
-  30 seconds so proxies don't close it; log streams send
-  `X-Accel-Buffering: no`; `100.64.0.0/10` (NetBird, Tailscale) is trusted
-  by default. New guide: `docs/REVERSE_PROXY.md`.
-- Per-environment access: an admin can limit an environment to chosen users
-  (or admins only) with `PUT /environments/:env/access`,
-  `locci env access NAME --users ann,bob | --admins-only | --everyone`, or
-  Access in the Environments page menu. Others don't see it in lists and get
-  404 on its routes (403 on the original routes when it's the default).
-  Environments stay open to everyone until restricted, and removing the last
-  listed user leaves one admin-only rather than open.
-- Container actions live in one options menu (list rows, cards and the
-  container page) instead of a Stop/Start button beside it; the menu lists
-  what fits the state and shows a spinner while an action runs. For plain
-  users the container list and details carry `LocciLocked` (why a protected
-  container is admin-only): the menu says so instead of offering actions,
-  and the Console tab is hidden.
 - A container's subdomain must be one DNS label (lowercase letters, digits,
   dashes): it is part of Traefik's label keys, where a dot or backtick could
   change other routes.
