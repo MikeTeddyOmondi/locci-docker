@@ -322,6 +322,11 @@ that is an API server, a web UI and a CLI.
   username from anywhere, within 15 minutes, logins answer 429 with
   `Retry-After` until the window ends. The SSO device-flow endpoints allow 30
   requests a minute per IP. Failed and refused logins are in the audit log.
+- API tokens expire after `LOCCI_TOKEN_TTL_DAYS` (default 30) without use;
+  each use pushes the date back, and tokens from before the upgrade start
+  their 30 days at the upgrade. `GET /auth/tokens` and
+  `DELETE /auth/tokens/:id`, `locci sessions [revoke ID]` and a Sessions
+  dialog in the web UI's user menu list and sign out your own sessions.
 
 ### Notes
 

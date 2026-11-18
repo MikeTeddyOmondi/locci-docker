@@ -43,6 +43,7 @@ func serveCmd() *cobra.Command {
 				return err
 			}
 			defer db.Close()
+			db.TokenTTL = time.Duration(cfg.TokenTTLDays) * 24 * time.Hour
 
 			// First start: register this host as the "local" default environment.
 			if _, err := db.EnsureDefaultEnvironment(); err != nil {

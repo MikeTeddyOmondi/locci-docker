@@ -69,6 +69,8 @@ func (s *Server) Router(mode string) *gin.Engine {
 
 	api.GET("/auth/me", s.me)
 	api.POST("/auth/logout", s.logout)
+	api.GET("/auth/tokens", s.listTokens)
+	api.DELETE("/auth/tokens/:id", s.revokeToken)
 
 	// Docker resources on the default environment. The four legacy container
 	// routes and GET/POST /networks are the original v1 API, unchanged.

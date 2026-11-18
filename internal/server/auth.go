@@ -44,10 +44,11 @@ func (s *Server) auth(c *gin.Context) {
 
 	user, err := s.Store.UserByToken(token)
 	if err != nil {
-		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
 		return
 	}
 	c.Set("user", user)
+	c.Set("token", token)
 	c.Next()
 }
 
@@ -125,6 +126,30 @@ func (s *Server) logout(c *gin.Context) {
 
 func (s *Server) me(c *gin.Context) {
 	c.JSON(http.StatusOK, currentUser(c))
+}
+
+// listTokens shows the caller's own sign-ins (API tokens), never the tokens.
+func (s *Server) listTokens(c *gin.Context) {
+	u := currentUser(c)
+	if u.ID == 0 { // AUTH_TOKEN: not a stored token
+		c.JSON(http.StatusOK, gin.H{"tokens": []store.Token{}})
+		return
+	}
+	list, err := s.Store.Tokens(u.ID, c.GetString("token"))
+	if err != nil {
+		s.fail(c, http.StatusInternalServerError, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"tokens": list})
+}
+
+// revokeToken signs out one of the caller's own sessions.
+func (s *Server) revokeToken(c *gin.Context) {
+	if err := s.Store.RevokeToken(currentUser(c).ID, c.Param("id")); err != nil {
+		s.fail(c, notFoundOr500(err), err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "revoked"})
 }
 
 // ---- users (admin) ----

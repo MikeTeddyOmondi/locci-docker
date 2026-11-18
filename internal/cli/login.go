@@ -108,3 +108,63 @@ func whoamiCmd() *cobra.Command {
 		},
 	}
 }
+
+func sessionsCmd() *cobra.Command {
+	list := &cobra.Command{
+		Use:   "sessions",
+		Short: "List your sign-ins (API tokens) on the server",
+		Long: `List your sign-ins: one per browser, CLI login or SSO sign-in. A token
+expires after LOCCI_TOKEN_TTL_DAYS (default 30) without use.`,
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			var out struct {
+				Tokens []struct {
+					ID       string `json:"id"`
+					Name     string `json:"name"`
+					Created  string `json:"created_at"`
+					LastUsed string `json:"last_used_at"`
+					Expires  string `json:"expires_at"`
+					Current  bool   `json:"current"`
+				} `json:"tokens"`
+			}
+			if err := api().Do("GET", "/api/v1/auth/tokens", nil, &out); err != nil {
+				return err
+			}
+			if outputJSON {
+				return printJSON(out.Tokens)
+			}
+			rows := make([][]string, len(out.Tokens))
+			for i, t := range out.Tokens {
+				id := t.ID
+				if t.Current {
+					id += " *"
+				}
+				expires := t.Expires
+				if expires == "" {
+					expires = "never"
+				}
+				name := t.Name
+				if len(name) > 40 { // browsers name themselves with the whole User-Agent
+					name = name[:37] + "..."
+				}
+				rows[i] = []string{id, name, t.Created, t.LastUsed, expires}
+			}
+			return table("ID\tNAME\tCREATED\tLAST USED\tEXPIRES", rows)
+		},
+	}
+	list.AddCommand(&cobra.Command{
+		Use:   "revoke ID...",
+		Short: "Sign out sessions by ID (from locci sessions)",
+		Args:  cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			for _, id := range args {
+				if err := api().Do("DELETE", "/api/v1/auth/tokens/"+id, nil, nil); err != nil {
+					return fmt.Errorf("%s: %w", id, err)
+				}
+				fmt.Println("revoked", id)
+			}
+			return nil
+		},
+	})
+	return list
+}

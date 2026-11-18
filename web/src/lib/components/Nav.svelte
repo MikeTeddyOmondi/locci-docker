@@ -16,11 +16,14 @@
 	import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
 	import ServerIcon from '@lucide/svelte/icons/server';
 	import KeyRoundIcon from '@lucide/svelte/icons/key-round';
+	import MonitorSmartphoneIcon from '@lucide/svelte/icons/monitor-smartphone';
 	import EnvSwitcher from '$lib/components/EnvSwitcher.svelte';
+	import SessionsDialog from '$lib/components/SessionsDialog.svelte';
 	import { session } from '$lib/session.svelte.js';
 	import { href as envHref } from '$lib/env.svelte.js';
 
 	let { onlogout } = $props();
+	let sessionsOpen = $state(false);
 
 	// Fleet links stay inside the current environment; envHref reads
 	// envs.current, so they update when the environment changes.
@@ -122,11 +125,16 @@
 					<div class="text-xs text-muted-foreground">Signed in as {session.user?.role}</div>
 				</DropdownMenu.Label>
 				<DropdownMenu.Separator />
+				<DropdownMenu.Item onclick={() => (sessionsOpen = true)}>
+					<MonitorSmartphoneIcon />
+					Sessions
+				</DropdownMenu.Item>
 				<DropdownMenu.Item variant="destructive" onclick={onlogout}>
 					<LogOutIcon />
 					Log out
 				</DropdownMenu.Item>
 			</DropdownMenu.Content>
 		</DropdownMenu.Root>
+		<SessionsDialog bind:open={sessionsOpen} />
 	</div>
 </div>

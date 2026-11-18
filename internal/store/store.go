@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	_ "github.com/tursodatabase/go-libsql"
 	"golang.org/x/crypto/bcrypt"
@@ -45,6 +46,10 @@ type AuditEntry struct {
 
 type Store struct {
 	DB *sql.DB
+
+	// TokenTTL is how long an API token stays valid after its last use
+	// (LOCCI_TOKEN_TTL_DAYS). Zero means tokens never expire.
+	TokenTTL time.Duration
 }
 
 var schema = []string{
@@ -129,6 +134,14 @@ var schema = []string{
 	)`,
 }
 
+// addedColumns extend tables that already shipped; on a database that has
+// them, SQLite answers "duplicate column" and that is fine.
+// After a column is added, its follow-up (if any) runs once.
+var addedColumns = []struct{ add, then string }{
+	// Tokens from before expiry existed start their 30 days at the upgrade.
+	{`ALTER TABLE tokens ADD COLUMN last_used_at TEXT`, `UPDATE tokens SET last_used_at = CURRENT_TIMESTAMP`},
+}
+
 // Open connects and creates the tables if needed.
 func Open(url string) (*Store, error) {
 	db, err := sql.Open("libsql", url)
@@ -148,7 +161,17 @@ func Open(url string) (*Store, error) {
 			return nil, fmt.Errorf("migrate: %w", err)
 		}
 	}
-	return &Store{DB: db}, nil
+	for _, c := range addedColumns {
+		_, err := db.Exec(c.add)
+		if err == nil && c.then != "" {
+			_, err = db.Exec(c.then)
+		}
+		if err != nil && !strings.Contains(err.Error(), "duplicate column") {
+			db.Close()
+			return nil, fmt.Errorf("migrate: %w", err)
+		}
+	}
+	return &Store{DB: db, TokenTTL: DefaultTokenTTL}, nil
 }
 
 func (s *Store) Close() error { return s.DB.Close() }
@@ -288,30 +311,7 @@ func (s *Store) scanUser(row *sql.Row) (User, error) {
 	return u, err
 }
 
-// ---- tokens ----
-
-// NewToken creates an API token. Only its hash is stored.
-func (s *Store) NewToken(userID int64, name string) (string, error) {
-	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
-	}
-	token := "lc_" + hex.EncodeToString(b)
-	_, err := s.DB.Exec(`INSERT INTO tokens (token_hash, user_id, name) VALUES (?, ?, ?)`,
-		hashToken(token), userID, name)
-	return token, err
-}
-
-func (s *Store) UserByToken(token string) (User, error) {
-	return s.scanUser(s.DB.QueryRow(`SELECT `+userColumns+`
-		FROM tokens t JOIN users u ON u.id = t.user_id
-		WHERE t.token_hash = ?`, hashToken(token)))
-}
-
-func (s *Store) DeleteToken(token string) error {
-	_, err := s.DB.Exec(`DELETE FROM tokens WHERE token_hash = ?`, hashToken(token))
-	return err
-}
+// ---- tokens: see tokens.go ----
 
 func hashToken(t string) string {
 	sum := sha256.Sum256([]byte(t))

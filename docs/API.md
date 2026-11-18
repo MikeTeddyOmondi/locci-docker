@@ -7,7 +7,11 @@ Base path: `/api/v1`. Requests and responses are JSON unless noted. Errors are
 ## Authentication
 
 Send a token as `Authorization: Bearer <token>`. WebSockets can't set headers,
-so the exec WebSocket also accepts `?token=<token>`.
+so the exec WebSocket also accepts `?token=<token>`; other requests don't.
+
+A token expires after `LOCCI_TOKEN_TTL_DAYS` (default 30) without use; every
+use pushes the date back. An expired, revoked or unknown token gets 401.
+Failed password logins are rate limited (429 with `Retry-After`).
 
 Tokens come from:
 
@@ -22,6 +26,8 @@ Tokens come from:
 | `POST /auth/login` | none | password login |
 | `GET /auth/me` | user | the current user (with `has_password`: false for SSO-only users) |
 | `POST /auth/logout` | user | revokes the token |
+| `GET /auth/tokens` | user | the caller's sessions: `id`, `name`, `created_at`, `last_used_at`, `expires_at`, `current` (never the token) |
+| `DELETE /auth/tokens/:id` | user | signs out one of the caller's sessions |
 
 `POST /auth/login` answers `403` while password login is turned off.
 

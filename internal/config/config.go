@@ -21,6 +21,7 @@ type Config struct {
 	SecretKey        string // LOCCI_SECRET_KEY, base64 32 bytes (internal/secret)
 	PublicURL        string // LOCCI_PUBLIC_URL, e.g. https://locci.example.com (OIDC redirect URIs)
 	TrustedProxies   string // LOCCI_TRUSTED_PROXIES; empty = loopback and private networks
+	TokenTTLDays     int    // LOCCI_TOKEN_TTL_DAYS: token lifetime after last use; 0 = never expire
 }
 
 // Load reads .env if present, then the process environment.
@@ -40,6 +41,7 @@ func Load() Config {
 		SecretKey:        os.Getenv("LOCCI_SECRET_KEY"),
 		PublicURL:        os.Getenv("LOCCI_PUBLIC_URL"),
 		TrustedProxies:   os.Getenv("LOCCI_TRUSTED_PROXIES"),
+		TokenTTLDays:     getInt("LOCCI_TOKEN_TTL_DAYS", 30),
 	}
 }
 

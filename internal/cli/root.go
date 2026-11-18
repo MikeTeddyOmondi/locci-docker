@@ -41,7 +41,7 @@ func newRoot() *cobra.Command {
 	}
 
 	client := []*cobra.Command{
-		loginCmd(), logoutCmd(), whoamiCmd(), envCmd(),
+		loginCmd(), logoutCmd(), whoamiCmd(), sessionsCmd(), envCmd(),
 		psCmd(), runCmd(), rmCmd(), logsCmd(), inspectCmd(), statsCmd(), execCmd(),
 		imageCmd(), networkCmd(), volumeCmd(), infoCmd(), auditCmd(),
 	}

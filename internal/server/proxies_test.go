@@ -58,3 +58,35 @@ func TestQueryTokenOnlyForWebSockets(t *testing.T) {
 		t.Errorf("header token: got %d", code)
 	}
 }
+
+func TestSessionsAPI(t *testing.T) {
+	ts, db := newTestServer(t)
+	db.CreateUser("ann", "correct-horse", "user")
+	login := func() string {
+		_, out := call(t, "POST", ts.URL+"/api/v1/auth/login", "", map[string]string{"username": "ann", "password": "correct-horse"})
+		return out["token"].(string)
+	}
+	laptop, phone := login(), login()
+
+	_, out := call(t, "GET", ts.URL+"/api/v1/auth/tokens", laptop, nil)
+	list, _ := out["tokens"].([]any)
+	if len(list) != 2 {
+		t.Fatalf("tokens: %v", out)
+	}
+	var other string
+	for _, x := range list {
+		m := x.(map[string]any)
+		if m["current"] != true {
+			other = m["id"].(string)
+		}
+	}
+	if code, _ := call(t, "DELETE", ts.URL+"/api/v1/auth/tokens/"+other, laptop, nil); code != 200 {
+		t.Fatalf("revoke: %d", code)
+	}
+	if code, _ := call(t, "GET", ts.URL+"/api/v1/auth/me", phone, nil); code != 401 {
+		t.Fatalf("revoked session still works: %d", code)
+	}
+	if code, _ := call(t, "DELETE", ts.URL+"/api/v1/auth/tokens/"+other, laptop, nil); code != 404 {
+		t.Fatalf("revoke twice: %d", code)
+	}
+}

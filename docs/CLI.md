@@ -24,6 +24,8 @@ locci login --url https://locci.example.com --sso keycloak # single sign-on in y
 locci login --url https://locci.example.com --sso keycloak --device  # no browser here: shows a code
 locci whoami
 locci logout                                             # revokes the token
+locci sessions                                           # your sign-ins; * marks this one
+locci sessions revoke 3232f9654fc97a73                   # sign one out
 ```
 
 `--sso` opens the browser at the server's sign-in page for that provider and
