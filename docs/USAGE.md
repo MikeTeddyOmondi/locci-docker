@@ -67,10 +67,23 @@ containers, CPUs, memory and OS. Click one to switch to it. Admins can add,
 edit, set the default, check now and remove. See
 [ENVIRONMENTS.md](ENVIRONMENTS.md).
 
+## Signing in
+
+The login page shows a "Continue with ..." button for each enabled single
+sign-on provider, and the password form while password login is on. See
+[OIDC.md](OIDC.md).
+
+## Sign-in (admin)
+
+Turn password login on or off, and add, edit, enable or remove OIDC
+providers. Each provider card shows the redirect URI to register at the
+provider; **Discover** in the dialog checks the issuer URL before saving.
+
 ## Users (admin)
 
 Add users with a password and the role `user` or `admin`, and delete them
-(not yourself). Admins also see environments' admin actions, users and the
+(not yourself). Users created by single sign-on have no password and show an
+"SSO" badge. Admins also see environments' admin actions, users and the
 audit log.
 
 ## Audit log (admin)

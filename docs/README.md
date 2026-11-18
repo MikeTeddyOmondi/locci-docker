@@ -9,7 +9,8 @@
 | [DOCKER.md](DOCKER.md) | Running locci itself in Docker, and building the image |
 | [CONFIGURATION.md](CONFIGURATION.md) | Every environment variable and the `.env` file |
 | [SECURITY.md](SECURITY.md) | Tokens, stored secrets, SSH host key pinning, the Docker socket, the audit log |
-| [OIDC.md](OIDC.md) | Single sign-on (planned): how it will work and what stays the default |
+| [OIDC.md](OIDC.md) | Single sign-on: how it works, user matching, troubleshooting |
+| [oidc/](oidc/) | Provider guides with manual and scripted setups: [Keycloak](oidc/KEYCLOAK.md), [Authentik](oidc/AUTHENTIK.md), [Pocket ID](oidc/POCKETID.md), [Dex](oidc/DEX.md) |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | Working on locci: tooling, layout, tests, conventions |
 
 Planned work lives in [`../BACKLOG.md`](../BACKLOG.md) and what has landed in

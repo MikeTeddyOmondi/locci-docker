@@ -12,7 +12,8 @@ win over it. Copy [`.env.sample`](../.env.sample) to start.
 | `GIN_MODE` | `release` | `debug` prints every route and request at startup |
 | `DATABASE_URL` | `file:locci.db` | libsql database: a local file, or `libsql://<db>.turso.io?authToken=...` for Turso |
 | `AUTH_TOKEN` | empty | Optional static admin token for machine-to-machine calls. Leave empty to require user logins only |
-| `LOCCI_SECRET_KEY` | empty | 32 random bytes, base64. Encrypts the TLS and SSH keys of remote environments. Generate with `openssl rand -base64 32` |
+| `LOCCI_SECRET_KEY` | empty | 32 random bytes, base64. Encrypts the TLS and SSH keys of remote environments and OIDC client secrets, and seals the sign-in cookie. Generate with `openssl rand -base64 32` |
+| `LOCCI_PUBLIC_URL` | empty | The address people open locci at, such as `https://locci.example.com`. Used for OIDC redirect URIs; without it they come from each request (`X-Forwarded-*` aware) |
 | `DOCKER_HOST` | empty | Docker daemon for the `local` environment. Empty means the local socket. `DOCKER_TLS_VERIFY` and `DOCKER_CERT_PATH` are honoured too |
 | `TRAEFIK_DOMAIN` | `locci.cloud` | Base domain for the Traefik labels put on created containers (`<subdomain>.<domain>`) |
 

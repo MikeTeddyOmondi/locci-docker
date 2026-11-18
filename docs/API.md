@@ -20,8 +20,37 @@ Tokens come from:
 |---|---|---|
 | `GET /health` | none | `200 {"status":"healthy"}` when the default environment's Docker answers, else `503` |
 | `POST /auth/login` | none | password login |
-| `GET /auth/me` | user | the current user |
+| `GET /auth/me` | user | the current user (with `has_password`: false for SSO-only users) |
 | `POST /auth/logout` | user | revokes the token |
+
+`POST /auth/login` answers `403` while password login is turned off.
+
+## Single sign-on
+
+See [OIDC.md](OIDC.md). Public routes:
+
+| Route | Notes |
+|---|---|
+| `GET /auth/providers` | `{"password_login": true, "providers": [{"slug","display_name"}]}`; the list is empty until a provider is enabled |
+| `GET /auth/oidc/:provider/start[?cli_port=N]` | redirects to the provider; `404` unless the provider is enabled |
+| `GET /auth/oidc/:provider/callback` | finishes sign-in; redirects to `/login#token=...` (or `#error=...`), or for the CLI to `http://127.0.0.1:N/callback?token=...` |
+
+Admin routes:
+
+| Route | Notes |
+|---|---|
+| `GET /sso/providers` | `{"providers": [...], "password_login": bool}`; each has `has_secret` and the `redirect_uri` to register, never the secret |
+| `POST /sso/providers` | create; body below; `412` without `LOCCI_SECRET_KEY` |
+| `PATCH /sso/providers/:provider` | fields you send change; `client_secret` "" keeps the stored one, `"clear_secret": true` removes it |
+| `DELETE /sso/providers/:provider` | linked identities go too; the users stay |
+| `POST /sso/providers/test` | `{"issuer_url": "..."}`; runs discovery: `{"ok", "authorization_endpoint", "token_endpoint", "scopes_supported", "warnings"}` or `{"ok": false, "error"}` |
+| `GET /sso/settings` | `{"password_login", "public_url"}` |
+| `PUT /sso/settings` | `{"password_login": false}`; `409` while no provider is enabled |
+
+Provider body: `slug`, `display_name`, `issuer_url`, `client_id`,
+`client_secret`, `scopes` (default `openid email profile`), `enabled`,
+`auto_create_users`, `default_role` (`user` or `admin`), `admin_group`,
+`groups_claim` (default `groups`), `allowed_email_domains` (comma separated).
 
 ## Environments
 

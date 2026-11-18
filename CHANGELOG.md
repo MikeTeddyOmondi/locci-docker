@@ -193,6 +193,13 @@ that is an API server, a web UI and a CLI.
     dialog with **Discover** to check the issuer before saving. A blank
     secret on edit keeps the stored one. Tested end to end against Dex in
     the browser and with `locci login --sso`.
+  - Docs: `docs/OIDC.md` (defaults, user matching, troubleshooting) and a
+    guide per self-hosted provider in `docs/oidc/` (Keycloak, Authentik,
+    Pocket ID, Dex), each with manual and scripted setup. All four were
+    tested end to end in a browser: Keycloak (group to admin role and back),
+    Authentik (needs `authorization_code` in the provider's grant types and a
+    verified-email mapping for domain lists), Pocket ID (needs the `groups`
+    scope; emails arrive unverified) and Dex (web and `locci login --sso`).
 
 ### Changed
 

@@ -8,6 +8,8 @@ Manage the local Docker host and any number of remote ones over TLS or SSH.
 - **CLI**: Cobra, talks to the same API from anywhere
 - **Environments**: several Docker hosts (local socket, `tcp+tls`, `ssh`), with
   health checks, pinned SSH host keys and keys encrypted at rest
+- **Single sign-on**: any OpenID Connect provider (Keycloak, Authentik, Pocket ID,
+  Dex, ...), off until an admin enables one; passwords stay the default
 - **Storage**: libsql (local file or Turso) for users, tokens, environments and the audit log
 - **Deploy jobs**: optional RabbitMQ consumer
 
@@ -48,7 +50,7 @@ locci ps -E edge
 | [Docker](docs/DOCKER.md) | running locci in a container |
 | [Configuration](docs/CONFIGURATION.md) | environment variables |
 | [Security](docs/SECURITY.md) | tokens, secrets, host keys, the Docker socket |
-| [OIDC](docs/OIDC.md) | single sign-on (planned) |
+| [OIDC](docs/OIDC.md) | single sign-on, with [provider guides](docs/oidc/) |
 | [Development](docs/DEVELOPMENT.md) | layout, tests, conventions |
 
 Planned work: [BACKLOG.md](BACKLOG.md). Changes: [CHANGELOG.md](CHANGELOG.md).

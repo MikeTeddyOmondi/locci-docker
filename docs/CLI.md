@@ -20,9 +20,15 @@ Global flags:
 ```sh
 locci login --url https://locci.example.com -u mike     # prompts for the password
 locci login --url http://localhost:8998 --token $AUTH_TOKEN
+locci login --url https://locci.example.com --sso keycloak # single sign-on in your browser
 locci whoami
 locci logout                                             # revokes the token
 ```
+
+`--sso` opens the browser at the server's sign-in page for that provider and
+listens on `127.0.0.1` for the result (the URL is printed too, for machines
+where no browser opens). The provider names are the slugs shown on the
+Sign-in page; see [OIDC.md](OIDC.md).
 
 The URL and token are saved in the CLI config file (see
 [CONFIGURATION.md](CONFIGURATION.md#cli)); `LOCCI_URL` and `LOCCI_TOKEN`
@@ -107,8 +113,9 @@ On the server host, directly against the database (no login needed):
 ```sh
 locci user add mike --admin                           # prompts for the password
 locci user ls
-locci user passwd mike
+locci user passwd mike                                # also gives an SSO-only user a password
 locci user rm mike
+locci auth password-login on                          # break-glass if single sign-on is broken
 ```
 
 From source, `just cli <args>` runs any of these without installing, for
