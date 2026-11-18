@@ -50,7 +50,8 @@ type Service struct {
 	Domain string // Traefik base domain, e.g. locci.cloud
 	Log    *slog.Logger
 
-	ssh *sshDialer // set for ssh:// hosts (see connect.go)
+	ssh     *sshDialer   // set for ssh:// hosts (see connect.go)
+	dialErr func() error // the real cause of the last failed dial, for custom dialers
 }
 
 // New connects to host (or DOCKER_HOST / the local socket when empty).
@@ -59,13 +60,13 @@ func New(host, domain string, log *slog.Logger) (*Service, error) {
 	return NewWithOptions(Options{Host: host, Domain: domain, Log: log})
 }
 
-// Ping checks the daemon is reachable. For SSH hosts the Docker client hides
-// the dial error behind "Cannot connect to the Docker daemon at
-// http://docker.invalid", so the SSH cause is returned instead.
+// Ping checks the daemon is reachable. With a custom dialer (SSH, agent
+// tunnel) the Docker client hides the dial error behind "Cannot connect to
+// the Docker daemon at http://docker.invalid", so the real cause is returned.
 func (s *Service) Ping(ctx context.Context) error {
 	_, err := s.Client.Ping(ctx)
-	if err != nil && s.ssh != nil {
-		if cause := s.ssh.dialError(); cause != nil {
+	if err != nil && s.dialErr != nil {
+		if cause := s.dialErr(); cause != nil {
 			return cause
 		}
 	}

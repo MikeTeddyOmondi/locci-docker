@@ -25,6 +25,9 @@ type Options struct {
 	Log    *slog.Logger
 	TLS    *TLSOptions // for tcp:// with client certificates
 	SSH    *SSHOptions // for ssh://
+	// Dial, when set, provides every connection to the Docker API (agent
+	// environments dial through their tunnel). Host is ignored then.
+	Dial func(ctx context.Context) (net.Conn, error)
 }
 
 // TLSOptions holds PEM-encoded material for Docker's TLS port.
@@ -51,6 +54,9 @@ func NewWithOptions(o Options) (*Service, error) {
 	if o.SSH != nil {
 		return newSSH(o)
 	}
+	if o.Dial != nil {
+		return newDialer(o)
+	}
 
 	opts := []client.Opt{client.WithAPIVersionNegotiation()}
 	if o.TLS != nil {
@@ -74,6 +80,34 @@ func NewWithOptions(o Options) (*Service, error) {
 	}
 	return &Service{Client: cli, Domain: o.Domain, Log: o.Log}, nil
 }
+
+// newDialer builds a client whose connections all come from o.Dial.
+func newDialer(o Options) (*Service, error) {
+	rec := &dialRecorder{}
+	cli, err := client.NewClientWithOpts(
+		client.WithHost("http://docker.invalid"),
+		client.WithDialContext(func(ctx context.Context, _, _ string) (net.Conn, error) {
+			c, err := o.Dial(ctx)
+			rec.set(err)
+			return c, err
+		}),
+		client.WithAPIVersionNegotiation(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("docker client: %w", err)
+	}
+	return &Service{Client: cli, Domain: o.Domain, Log: o.Log, dialErr: rec.get}, nil
+}
+
+// dialRecorder keeps the last dial error, which the Docker client would
+// otherwise replace with a generic "Cannot connect" message.
+type dialRecorder struct {
+	mu  sync.Mutex
+	err error
+}
+
+func (r *dialRecorder) set(err error) { r.mu.Lock(); r.err = err; r.mu.Unlock() }
+func (r *dialRecorder) get() error    { r.mu.Lock(); defer r.mu.Unlock(); return r.err }
 
 func tlsConfig(t TLSOptions) (*tls.Config, error) {
 	if t.CA == "" || t.Cert == "" || t.Key == "" {
@@ -139,7 +173,7 @@ func newSSH(o Options) (*Service, error) {
 	if err != nil {
 		return nil, fmt.Errorf("docker client: %w", err)
 	}
-	return &Service{Client: cli, Domain: o.Domain, Log: o.Log, ssh: d}, nil
+	return &Service{Client: cli, Domain: o.Domain, Log: o.Log, ssh: d, dialErr: d.dialError}, nil
 }
 
 // hostKeyAlgorithms limits negotiation to the pinned key's type. Servers have

@@ -13,6 +13,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"log/slog"
+	"net"
 	"sync"
 	"time"
 
@@ -21,6 +22,7 @@ import (
 	"github.com/MikeTeddyOmondi/locci-docker/internal/docker"
 	"github.com/MikeTeddyOmondi/locci-docker/internal/secret"
 	"github.com/MikeTeddyOmondi/locci-docker/internal/store"
+	"github.com/MikeTeddyOmondi/locci-docker/internal/tunnel"
 )
 
 // HealthTimeout bounds a single ping in the health loop and in Test.
@@ -30,6 +32,7 @@ type Registry struct {
 	Store      *store.Store
 	Box        *secret.Box // may be nil: only local environments work then
 	DockerHost string      // DOCKER_HOST, used by local environments with no URL
+	Hub        *tunnel.Hub // connected agents, for agent environments
 	Domain     string      // Traefik domain passed to every docker.Service
 	Log        *slog.Logger
 
@@ -67,6 +70,12 @@ func (r *Registry) PlainOptions(e store.Environment, key string) (docker.Options
 		o.TLS = &docker.TLSOptions{CA: e.TLSCA, Cert: e.TLSCert, Key: key}
 	case store.KindSSH:
 		o.SSH = &docker.SSHOptions{PrivateKey: key, HostKey: e.SSHHostKey}
+	case store.KindAgent:
+		if r.Hub == nil {
+			return o, errors.New("agent environments aren't available on this server")
+		}
+		id := e.ID
+		o.Dial = func(ctx context.Context) (net.Conn, error) { return r.Hub.Dial(ctx, id) }
 	default:
 		return o, errors.New("unknown environment kind " + e.Kind)
 	}
