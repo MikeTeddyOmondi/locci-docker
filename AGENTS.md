@@ -125,8 +125,23 @@ docs/                user and operator docs; docs/oidc/ per identity provider
 - One logical change per commit.
 - No AI attribution in commits or pull requests (no `Co-Authored-By`
   trailers, no "Generated with" notes).
-- Never push, tag, force-push or rewrite history without the maintainer
-  asking.
+- Work on a branch and open a pull request; `main` changes only through
+  merged PRs. Give the PR a Conventional Commit title: it becomes the merge
+  commit's description.
+- PRs are merged with a merge commit (not squash or rebase), so the branch's
+  one-line commits stay in history. The merge commit reads:
+
+  ```
+  merge PR #6 from MikeTeddyOmondi/fix/release-verify-loop
+
+  fix(release): verify only the files that were signed (#6)
+  ```
+
+  that is, `merge PR #<n> from <owner>/<branch>`, a blank line, then the PR
+  title and ` (#<n>)`. With `gh`:
+  `gh pr merge <n> --merge --subject "merge PR #<n> from <owner>/<branch>" --body "<title> (#<n>)"`.
+- Never merge, push, tag, force-push or rewrite history without the
+  maintainer asking.
 - Ask before touching uncommitted changes you didn't make.
 
 ## Where things go
