@@ -38,7 +38,9 @@ their reach.
 - Passwords are stored as bcrypt hashes; they need 8+ characters.
 - Password logins are rate limited: 10 failures from one IP, or 20 for one
   username from anywhere, within 15 minutes lock that IP or username out until
-  the window ends (HTTP 429). Failures are in the audit log. A login for an
+  the window ends (HTTP 429). The username lockout doesn't apply at addresses
+  where that user signed in successfully in the last 30 days, so guessing
+  from elsewhere can't lock the owner out. Failures are in the audit log. A login for an
   unknown username takes as long as a wrong password.
 - Logging in (web UI or `locci login`) issues an API token `lc_<64 hex>`. Only
   its SHA-256 hash is stored; logging out deletes it. Deleting a user deletes

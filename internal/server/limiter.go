@@ -79,6 +79,49 @@ type limits struct {
 	loginIP   *limiter // failed logins per client IP
 	loginUser *limiter // failed logins per username, from anywhere
 	device    *limiter // SSO device-flow requests per client IP
+	known     *knownIPs
+}
+
+// knownIPs remembers where each user last signed in successfully. The
+// per-username lockout doesn't apply there, so guessing a user's password
+// from elsewhere can't lock the user out of their usual address.
+type knownIPs struct {
+	ttl time.Duration
+	now func() time.Time
+
+	mu   sync.Mutex
+	seen map[string]map[string]time.Time // username -> IP -> last success
+}
+
+func newKnownIPs(ttl time.Duration) *knownIPs {
+	return &knownIPs{ttl: ttl, now: time.Now, seen: map[string]map[string]time.Time{}}
+}
+
+func (k *knownIPs) add(user, ip string) {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	ips := k.seen[user]
+	if ips == nil {
+		ips = map[string]time.Time{}
+		k.seen[user] = ips
+	}
+	now := k.now()
+	for a, t := range ips { // forget stale addresses as we go
+		if now.Sub(t) > k.ttl {
+			delete(ips, a)
+		}
+	}
+	if _, ok := ips[ip]; !ok && len(ips) >= 20 { // a handful per user is plenty
+		return
+	}
+	ips[ip] = now
+}
+
+func (k *knownIPs) has(user, ip string) bool {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	t, ok := k.seen[user][ip]
+	return ok && k.now().Sub(t) <= k.ttl
 }
 
 func (s *Server) limits() *limits {
@@ -87,6 +130,7 @@ func (s *Server) limits() *limits {
 			loginIP:   newLimiter(10, 15*time.Minute),
 			loginUser: newLimiter(20, 15*time.Minute),
 			device:    newLimiter(30, time.Minute),
+			known:     newKnownIPs(30 * 24 * time.Hour),
 		}
 	})
 	return s.lim

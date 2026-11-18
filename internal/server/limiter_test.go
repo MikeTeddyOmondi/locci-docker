@@ -1,6 +1,10 @@
 package server
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"net/http"
 	"testing"
 	"time"
 )
@@ -65,5 +69,40 @@ func TestLoginRateLimit(t *testing.T) {
 	}
 	if failed != 10 || limited != 1 {
 		t.Errorf("audit: %d failed, %d limited", failed, limited)
+	}
+}
+
+// Guessing a user's password from many addresses locks the username, but not
+// for the address the user signed in from before.
+func TestUsernameLockoutSparesKnownAddress(t *testing.T) {
+	ts, db := newTestServer(t)
+	db.CreateUser("ann", "correct-horse", "user")
+	// The test client is loopback, a trusted proxy, so X-Forwarded-For sets
+	// the client IP.
+	login := func(ip, pw string) int {
+		body, _ := json.Marshal(map[string]string{"username": "ann", "password": pw})
+		req, _ := http.NewRequest("POST", ts.URL+"/api/v1/auth/login", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Forwarded-For", ip)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+	if code := login("10.0.0.1", "correct-horse"); code != 200 {
+		t.Fatalf("first login: %d", code)
+	}
+	for i := range 20 {
+		if code := login(fmt.Sprintf("10.1.0.%d", i+1), "wrong"); code != 401 {
+			t.Fatalf("guess %d: %d", i+1, code)
+		}
+	}
+	if code := login("10.9.9.9", "correct-horse"); code != 429 {
+		t.Errorf("new address after the username lockout: %d, want 429", code)
+	}
+	if code := login("10.0.0.1", "correct-horse"); code != 200 {
+		t.Errorf("known address after the username lockout: %d, want 200", code)
 	}
 }
