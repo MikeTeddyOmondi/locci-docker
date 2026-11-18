@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/MikeTeddyOmondi/locci-docker/internal/client"
 	"github.com/MikeTeddyOmondi/locci-docker/internal/env"
@@ -69,5 +70,49 @@ func TestSSOLoginLoopback(t *testing.T) {
 	idp.Deny()
 	if _, err := ssoLogin(client.Config{URL: ts.URL}, "fake"); err == nil {
 		t.Fatal("expected the denied sign-in to fail")
+	}
+}
+
+// The device flow end to end: the test approves on "another device".
+func TestSSODeviceLogin(t *testing.T) {
+	db, err := store.Open("file:" + filepath.Join(t.TempDir(), "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	k := make([]byte, 32)
+	rand.Read(k)
+	box, _ := secret.New(base64.StdEncoding.EncodeToString(k))
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	idp := ssotest.New(t)
+	sealed, _ := box.Seal(idp.ClientSecret)
+	db.CreateProvider(store.Provider{Slug: "fake", IssuerURL: idp.URL, ClientID: idp.ClientID,
+		ClientSecret: sealed, Enabled: true, AutoCreateUsers: true})
+	idp.SetUser(map[string]any{"sub": "u-2", "email": "kai@example.com", "email_verified": true})
+
+	srv := &server.Server{Envs: &env.Registry{Store: db, Log: log}, SSO: &sso.Service{Store: db, Box: box, Log: log}, Store: db, Log: log}
+	ts := httptest.NewServer(srv.Router("test"))
+	defer ts.Close()
+
+	go func() {
+		time.Sleep(300 * time.Millisecond) // after the code is issued, before the first poll
+		idp.ApproveDevice()
+	}()
+	token, err := ssoDeviceLogin(client.Config{URL: ts.URL}, "fake")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var me struct{ Username string }
+	if err := client.New(client.Config{URL: ts.URL, Token: token}).Do("GET", "/api/v1/auth/me", nil, &me); err != nil || me.Username != "kai@example.com" {
+		t.Fatalf("device token: %v %+v", err, me)
+	}
+
+	go func() {
+		time.Sleep(300 * time.Millisecond)
+		idp.DenyDevice()
+	}()
+	if _, err := ssoDeviceLogin(client.Config{URL: ts.URL}, "fake"); err == nil {
+		t.Fatal("expected a denied device sign-in to fail")
 	}
 }

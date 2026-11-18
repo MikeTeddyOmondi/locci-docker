@@ -64,6 +64,54 @@ func ssoLogin(cfg client.Config, provider string) (string, error) {
 	}
 }
 
+// ssoDeviceLogin signs in with the device flow, for machines without a
+// browser: it shows a code to enter on any other device and polls the server
+// until the provider reports the outcome.
+func ssoDeviceLogin(cfg client.Config, provider string) (string, error) {
+	c := client.New(cfg)
+	base := "/api/v1/auth/oidc/" + url.PathEscape(provider) + "/device"
+	var dc struct {
+		UserCode                string `json:"user_code"`
+		VerificationURI         string `json:"verification_uri"`
+		VerificationURIComplete string `json:"verification_uri_complete"`
+		ExpiresIn               int64  `json:"expires_in"`
+		Interval                int64  `json:"interval"`
+		Handle                  string `json:"handle"`
+	}
+	if err := c.Do("POST", base, map[string]string{}, &dc); err != nil {
+		return "", err
+	}
+	fmt.Fprintf(os.Stderr, "To sign in with %s, open %s on any device and enter the code:\n\n    %s\n\n",
+		provider, dc.VerificationURI, dc.UserCode)
+	if dc.VerificationURIComplete != "" {
+		fmt.Fprintf(os.Stderr, "(or open %s)\n", dc.VerificationURIComplete)
+	}
+	fmt.Fprintln(os.Stderr, "Waiting for approval...")
+
+	interval := time.Duration(dc.Interval) * time.Second
+	if interval <= 0 {
+		interval = 5 * time.Second
+	}
+	deadline := time.Now().Add(time.Duration(dc.ExpiresIn) * time.Second)
+	for time.Now().Before(deadline) {
+		time.Sleep(interval)
+		var res struct {
+			Status string `json:"status"`
+			Token  string `json:"token"`
+		}
+		if err := c.Do("POST", base+"/token", map[string]string{"handle": dc.Handle}, &res); err != nil {
+			return "", err
+		}
+		switch res.Status {
+		case "ok":
+			return res.Token, nil
+		case "slow_down":
+			interval += 5 * time.Second
+		}
+	}
+	return "", errors.New("the code expired before it was approved; run the command again")
+}
+
 // openURL opens the user's browser; tests replace it.
 var openURL = openBrowser
 

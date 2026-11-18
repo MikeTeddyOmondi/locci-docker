@@ -193,6 +193,10 @@ that is an API server, a web UI and a CLI.
     provider. Users are matched exactly as in the browser flow, and sign-ins
     are audited as `LOGIN`. Providers without a
     `device_authorization_endpoint` get a clear error.
+  - CLI: `locci login --sso <provider> --device` prints the verification URL
+    and code (and the one-click URL when the provider gives one), then polls
+    at the provider's interval, backing off on `slow_down`, until approval,
+    denial or expiry.
   - Login page: a "Continue with ..." button per enabled provider, the
     password form only while password login is on, and pickup of the token
     (or error) from the URL fragment, which is then cleared. Users signed up

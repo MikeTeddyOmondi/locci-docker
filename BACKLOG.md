@@ -177,7 +177,7 @@ Libraries: `github.com/coreos/go-oidc/v3` (discovery, ID-token verification) and
 - [x] UI: admin providers page
 - [x] setting to disable password login
 - [x] CLI: `login --sso` (loopback); break-glass `locci auth password-login on`
-- [ ] later: CLI `login --device` (device authorization flow)
+- [x] CLI: `login --sso <provider> --device` (device authorization flow)
 - [x] tests with a fake OIDC provider (`httptest` issuer + signed tokens)
 - [x] docs: setup guides (manual and scripted) for Keycloak, Authentik, Pocket ID and Dex, each tested end to end
 - [ ] later: guides for hosted providers (Google, Entra ID) and Zitadel

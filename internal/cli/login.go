@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -13,11 +14,13 @@ import (
 
 func loginCmd() *cobra.Command {
 	var url, username, token, ssoProvider string
+	var device bool
 	cmd := &cobra.Command{
 		Use:   "login",
 		Short: "Log in to a locci server and save the token",
 		Example: `  locci login --url https://locci.example.com -u mike
   locci login --url https://locci.example.com --sso keycloak
+  locci login --url https://locci.example.com --sso keycloak --device   # no browser here
   locci login --url http://localhost:8998 --token $AUTH_TOKEN`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg := client.LoadConfig()
@@ -25,8 +28,15 @@ func loginCmd() *cobra.Command {
 				cfg.URL = url
 			}
 
+			if device && ssoProvider == "" {
+				return errors.New("--device needs --sso <provider>")
+			}
 			if token == "" && ssoProvider != "" {
-				t, err := ssoLogin(cfg, ssoProvider)
+				login := ssoLogin
+				if device {
+					login = ssoDeviceLogin
+				}
+				t, err := login(cfg, ssoProvider)
 				if err != nil {
 					return err
 				}
@@ -68,6 +78,7 @@ func loginCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&username, "username", "u", "", "username")
 	cmd.Flags().StringVar(&token, "token", "", "use an existing API token or AUTH_TOKEN instead of a password")
 	cmd.Flags().StringVar(&ssoProvider, "sso", "", "sign in through this identity provider in your browser (see the login page for names)")
+	cmd.Flags().BoolVar(&device, "device", false, "with --sso: show a code to approve on another device instead of opening a browser here")
 	return cmd
 }
 
