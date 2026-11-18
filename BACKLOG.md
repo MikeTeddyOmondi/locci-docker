@@ -27,7 +27,7 @@ UI pages stay the same; they just gain an environment parameter.
 | `local` | `unix:///var/run/docker.sock` | today's behaviour; created automatically as the default environment |
 | `tcp+tls` | `tcp://10.0.0.5:2376` | Docker's TLS port with client certs (CA, cert, key) |
 | `ssh` | `ssh://deploy@10.0.0.5` | uses Docker's SSH connection helper; no Docker port exposed |
-| `agent` | (later) | a `locci agent` on the remote host dials out to the server over a WebSocket tunnel, so hosts behind NAT/CGNAT work without opening ports |
+| `agent` | none | a `locci agent` on the remote host dials out to the server over a WebSocket tunnel, so hosts behind NAT/CGNAT work without opening ports |
 
 **Storage** (`internal/store`, new tables)
 
@@ -92,7 +92,7 @@ TLS keys and other secrets are encrypted at rest with AES-GCM using
 - [x] CLI: `env` commands, `-E/--environment` flag, saved default
 - [x] tests: registry, routing, backward-compatible routes
 - [ ] later: per-environment access for users (`environment_users`)
-- [ ] later: `agent` connection type (outbound tunnel)
+- [x] `agent` connection type (outbound tunnel over one WebSocket, yamux)
 
 **Done when:** an admin can add a remote host over TLS or SSH, test it,
 switch to it in the UI and CLI, and do everything they can do on the local

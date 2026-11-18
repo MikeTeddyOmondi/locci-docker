@@ -51,6 +51,20 @@ volumes:
   locci-data:
 ```
 
+## The agent image
+
+The same image runs the outbound agent on a remote Docker host (see
+[ENVIRONMENTS.md](ENVIRONMENTS.md#agent-hosts-outbound-behind-nat)):
+
+```sh
+docker run -d --name locci-agent --restart unless-stopped \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -e LOCCI_AGENT_TOKEN=la_... \
+  <image> agent --server https://locci.example.com
+```
+
+It needs no ports and no volume.
+
 ## Things to know
 
 - **The Docker socket is root on the host.** Anyone who can log in to locci
@@ -66,5 +80,7 @@ volumes:
 - **Turso instead of a file:** set `DATABASE_URL=libsql://<db>.turso.io?authToken=...`
   and the volume becomes optional.
 - **Behind a reverse proxy**, forward WebSockets for
-  `/api/v1/.../exec/ws` (the web console) and keep the `Host` header: the
-  WebSocket origin check compares the browser's `Origin` with it.
+  `/api/v1/.../exec/ws` (the web console) and `/api/v1/agent/connect`
+  (agents), don't time out idle WebSockets too eagerly (agents send a
+  keepalive every 20 seconds), and keep the `Host` header: the WebSocket
+  origin check compares the browser's `Origin` with it.

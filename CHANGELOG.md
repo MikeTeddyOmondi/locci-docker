@@ -146,7 +146,7 @@ that is an API server, a web UI and a CLI.
     keeps the stored one, Test connection works without re-entering it, and an
     SSH host's pinned key can be forgotten (it is dropped automatically when
     the URL changes).
-  - Agent environments (in progress): a fourth kind, `agent`, for hosts
+  - Agent environments: a fourth kind, `agent`, for hosts
     that dial out to the server. Each has an agent token (`la_...`), stored
     only as a hash in `agent_tokens`; issuing a new one replaces the old.
     `internal/tunnel` carries Docker connections over the agent's one
@@ -173,7 +173,7 @@ that is an API server, a web UI and a CLI.
     a one-time dialog with the token and the commands to start the agent
     (binary and `docker run`), cards that say whether the agent is
     connected, and a "Rotate agent token" action. Tested end to end with
-    `locci agent` on a separate machine process against the local Docker:
+    `locci agent` running as its own process against the local Docker:
     containers, logs, stats, the browser console and exec all work through
     the tunnel, and a rotated token disconnects the agent, which then stops.
 

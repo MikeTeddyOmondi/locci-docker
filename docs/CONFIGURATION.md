@@ -55,3 +55,7 @@ The CLI keeps its own small config file, written by `locci login` and
 | `LOCCI_URL` | the saved server URL |
 | `LOCCI_TOKEN` | the saved token |
 | `LOCCI_ENV` | the saved environment (the `-E/--environment` flag beats it) |
+
+`locci agent` (on a Docker host) reads `LOCCI_AGENT_TOKEN` and `LOCCI_SERVER`
+(instead of `--token` and `--server`), and `DOCKER_HOST` for the Docker it
+exposes.

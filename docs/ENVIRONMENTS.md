@@ -15,6 +15,7 @@ routes, deploy jobs without a `host` and new browsers use.
 | `local` | empty, `unix:///path.sock` or `tcp://host:2375` | none | the socket is reachable from the server itself |
 | `tcp+tls` | `tcp://host:2376` | CA certificate, client certificate, client key | the host exposes Docker's TLS port |
 | `ssh` | `ssh://user@host[:port][/socket/path]` | private key | you'd rather not expose any Docker port |
+| `agent` | none | an agent token | the host is behind NAT or a firewall: it runs `locci agent` and dials **out** to the server |
 
 Keys (the TLS client key, the SSH private key) are encrypted with
 `LOCCI_SECRET_KEY` before they are stored and are never returned by the API.
@@ -42,6 +43,42 @@ locci env add lab --kind tcp+tls --url tcp://10.0.0.6:2376 \
 Names are lowercase letters, digits and dashes, are used in URLs
 (`/e/edge/containers`) and in the CLI (`-E edge`), and can't be changed later.
 `test` is reserved.
+
+## Agent hosts (outbound, behind NAT)
+
+With the `agent` kind the Docker host connects to locci, not the other way
+round, so it needs no open port, public address or VPN: only outbound HTTPS
+to the locci server.
+
+1. Add an environment of kind **Agent (outbound)** (UI) or
+   `locci env add edge --kind agent` (CLI). You get an **agent token**
+   (`la_...`) once; locci keeps only its hash.
+2. On the Docker host, start the agent with that token:
+
+   ```sh
+   # with the binary
+   LOCCI_AGENT_TOKEN=la_... locci agent --server https://locci.example.com
+
+   # or in Docker (same image as the server)
+   docker run -d --name locci-agent --restart unless-stopped \
+     -v /var/run/docker.sock:/var/run/docker.sock \
+     -e LOCCI_AGENT_TOKEN=la_... \
+     <locci image> agent --server https://locci.example.com
+   ```
+
+3. Within seconds the environment shows as connected and works like any
+   other: containers, images, logs, stats, the console.
+
+How it works: the agent opens one WebSocket to
+`/api/v1/agent/connect` and the server multiplexes every Docker connection
+over it (yamux); the agent pipes each one into its local Docker socket
+(`--docker-host`, default `DOCKER_HOST` or `/var/run/docker.sock`). It
+reconnects on its own with backoff and stops for good if its token is
+refused.
+
+**Rotating the token** (UI menu, or `locci env edit edge --rotate-agent-token`)
+disconnects the running agent; restart it with the new token. Removing the
+environment disconnects it too.
 
 ## Preparing an SSH host
 
@@ -125,7 +162,7 @@ next request.
 ## Editing, the default, removing
 
 - **Edit** (UI menu or `locci env edit`) changes the label, URL, certificates
-  or key. Leave a key blank to keep the stored one; Test connection uses it.
+  or key (agents: the label, and the token through rotation). Leave a key blank to keep the stored one; Test connection uses it.
   The name and kind are fixed.
 - **Set as default** (or `locci env default NAME`) moves the original API
   routes and deploy jobs to that host.

@@ -88,6 +88,10 @@ Create, update and test body:
   `tls_key` (PEM strings).
 - `ssh_host_key` pins the key a previous test returned; without it, creating
   an SSH environment pins whatever key the host presents (when reachable).
+- `kind` `agent` needs no URL or keys. Creating one returns its
+  `agent_token` (`la_...`) **once**; `PATCH {"rotate_agent_token": true}`
+  issues a new one and disconnects the agent. Agent environments report
+  `agent_connected`.
 - `PATCH` also accepts `"reset_host_key": true`. `kind` can't change; changing
   `url` drops the pinned host key.
 - `POST /environments/test` with the `name` of an existing environment fills
@@ -107,6 +111,12 @@ Example environment:
   "ssh_fingerprint": "ecdsa-sha2-nistp256 SHA256:6YbW..."
 }
 ```
+
+## Agent connection
+
+| Route | Auth | Notes |
+|---|---|---|
+| `GET /agent/connect` | `Authorization: Bearer la_...` (agent token) | WebSocket upgrade used by `locci agent`; the response header `X-Locci-Environment` names the environment. The connection then carries yamux streams to the agent's Docker socket. `401` for an unknown token. |
 
 ## Docker resources
 

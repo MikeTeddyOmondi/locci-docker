@@ -60,6 +60,19 @@ changed`). Compare the fingerprint shown when adding a host with
 `ssh-keygen -lf` on the host. Forget the pin only when you know the host was
 rebuilt. Use a dedicated deploy key for locci, not your personal key.
 
+## Agents
+
+- An agent token (`la_...`) gives exactly one thing: the right to serve that
+  environment's Docker to the server. It can't call the API. Only its SHA-256
+  hash is stored; it is shown once.
+- The agent connects out over `wss://` with normal TLS verification, so it
+  only talks to the real server. Run the server with a valid certificate.
+- Whoever controls the locci server controls every connected host's Docker,
+  as with any other environment kind.
+- Rotate the token if it leaks: the running agent is dropped and the old
+  token stops working. Connects and disconnects are in the audit log as
+  `agent:<name>`.
+
 ## Web console
 
 The exec WebSocket checks the browser's `Origin` against the request's host

@@ -60,10 +60,10 @@ variables, like `docker run`.)
 
 ```sh
 locci env ls
-locci env add NAME --kind ssh|tcp+tls|local --url URL [--label TEXT]
+locci env add NAME --kind ssh|tcp+tls|local|agent --url URL [--label TEXT]
               [--ssh-key FILE] [--tls-ca FILE --tls-cert FILE --tls-key FILE] [--no-test]
 locci env edit NAME [--label TEXT] [--url URL] [--ssh-key FILE] [--tls-* FILE]
-               [--reset-host-key] [--no-test]
+               [--reset-host-key] [--rotate-agent-token] [--no-test]
 locci env test [NAME]              # reachable? prints Docker version, OS, CPUs, memory
 locci env use NAME | --clear
 locci env default NAME             # make it the server default (admin)
@@ -71,7 +71,20 @@ locci env rm NAME                  # admin; the host itself is not touched
 ```
 
 `add` and `edit` test the connection first and print the SSH host key
-fingerprint that gets pinned. See [ENVIRONMENTS.md](ENVIRONMENTS.md) for
+fingerprint that gets pinned. For `--kind agent` (no URL), `add` prints the
+agent token and the commands to start the agent instead.
+
+## Agent (on a Docker host behind NAT)
+
+```sh
+LOCCI_AGENT_TOKEN=la_... locci agent --server https://locci.example.com
+locci agent --server https://locci.example.com --docker-host unix:///run/user/1000/docker.sock
+```
+
+It dials out to the server, serves the local Docker over that connection,
+reconnects with backoff, and exits when its token is refused (rotated or the
+environment removed). Prefer `LOCCI_AGENT_TOKEN` over `--token` so the token
+doesn't appear in process lists. `LOCCI_SERVER` can replace `--server`. See [ENVIRONMENTS.md](ENVIRONMENTS.md) for
 preparing hosts.
 
 ## Containers

@@ -6,8 +6,9 @@ Manage the local Docker host and any number of remote ones over TLS or SSH.
 - **Web UI**: Svelte 5 / SvelteKit with shadcn-svelte, embedded with `go:embed`
 - **API**: Gin, `/api/v1`, bearer-token auth (user tokens or a static `AUTH_TOKEN`)
 - **CLI**: Cobra, talks to the same API from anywhere
-- **Environments**: several Docker hosts (local socket, `tcp+tls`, `ssh`), with
-  health checks, pinned SSH host keys and keys encrypted at rest
+- **Environments**: several Docker hosts (local socket, `tcp+tls`, `ssh`, or an
+  outbound `locci agent` for hosts behind NAT), with health checks, pinned SSH
+  host keys and keys encrypted at rest
 - **Single sign-on**: any OpenID Connect provider (Keycloak, Authentik, Pocket ID,
   Dex, ...), off until an admin enables one; passwords stay the default
 - **Storage**: libsql (local file or Turso) for users, tokens, environments and the audit log
