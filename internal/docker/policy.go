@@ -40,15 +40,27 @@ func ProtectedReason(info container.InspectResponse) string {
 	if info.HostConfig != nil && info.HostConfig.Privileged {
 		return "it is privileged"
 	}
-	for _, m := range info.Mounts {
-		if m.Type != mount.TypeBind {
-			continue
-		}
-		if m.Source == "/" || strings.HasSuffix(m.Source, "docker.sock") || strings.HasSuffix(m.Destination, "docker.sock") {
+	return mountReason(info.Mounts)
+}
+
+// mountReason checks for a bind mount of the Docker socket or the host's /.
+func mountReason(mounts []container.MountPoint) string {
+	for _, m := range mounts {
+		if m.Type == mount.TypeBind && (m.Source == "/" || strings.HasSuffix(m.Source, "docker.sock") || strings.HasSuffix(m.Destination, "docker.sock")) {
 			return "it has the host's Docker socket or root directory mounted"
 		}
 	}
 	return ""
+}
+
+// ProtectedSummaryReason is ProtectedReason for a container list entry, which
+// carries labels and mounts but not the privileged flag (the per-container
+// routes still check that).
+func ProtectedSummaryReason(c container.Summary) string {
+	if c.Labels[ProtectedLabel] == "true" {
+		return "it is labelled " + ProtectedLabel
+	}
+	return mountReason(c.Mounts)
 }
 
 // RouterOwner returns the name of a container that already routes subdomain

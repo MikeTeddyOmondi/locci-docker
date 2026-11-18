@@ -6,10 +6,24 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/docker/docker/api/types/container"
 	"github.com/gin-gonic/gin"
 
 	"github.com/MikeTeddyOmondi/locci-docker/internal/docker"
 )
+
+// lockedSummary is a list entry plus, for plain users, why they can't manage
+// it (empty when they can). The UI disables the actions and says why.
+type lockedSummary struct {
+	container.Summary
+	Locked string `json:"LocciLocked,omitempty"`
+}
+
+// lockedInspect is the same for one container's details.
+type lockedInspect struct {
+	container.InspectResponse
+	Locked string `json:"LocciLocked,omitempty"`
+}
 
 func (s *Server) listContainers(c *gin.Context) {
 	list, err := dk(c).ListContainers(c.Request.Context())
@@ -17,7 +31,15 @@ func (s *Server) listContainers(c *gin.Context) {
 		s.fail(c, http.StatusInternalServerError, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"containers": list})
+	restricted := s.restricted(c)
+	out := make([]lockedSummary, len(list))
+	for i, ct := range list {
+		out[i].Summary = ct
+		if restricted {
+			out[i].Locked = docker.ProtectedSummaryReason(ct)
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{"containers": out})
 }
 
 func (s *Server) createContainer(c *gin.Context) {
@@ -52,13 +74,17 @@ func (s *Server) inspectContainer(c *gin.Context) {
 	}
 	// A protected container's environment holds the host's secrets (for
 	// locci itself: LOCCI_SECRET_KEY, AUTH_TOKEN); plain users don't see it.
-	if s.restricted(c) && info.Config != nil && docker.ProtectedReason(info) != "" {
+	out := lockedInspect{InspectResponse: info}
+	if s.restricted(c) {
+		out.Locked = docker.ProtectedReason(info)
+	}
+	if out.Locked != "" && info.Config != nil {
 		for i, e := range info.Config.Env {
 			name, _, _ := strings.Cut(e, "=")
 			info.Config.Env[i] = name + "=(hidden)"
 		}
 	}
-	c.JSON(http.StatusOK, info)
+	c.JSON(http.StatusOK, out)
 }
 
 // containerAction returns a handler for POST /containers/:id/<action>.

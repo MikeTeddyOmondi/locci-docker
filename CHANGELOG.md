@@ -353,6 +353,12 @@ that is an API server, a web UI and a CLI.
   The binary is static (`CGO_ENABLED=0`), existing database files open
   unchanged, and the Dockerfile cross-compiles per platform instead of
   emulating. `locci --version` reports the build's version.
+- Container actions live in one options menu (list rows, cards and the
+  container page) instead of a Stop/Start button beside it; the menu lists
+  what fits the state and shows a spinner while an action runs. For plain
+  users the container list and details carry `LocciLocked` (why a protected
+  container is admin-only): the menu says so instead of offering actions,
+  and the Console tab is hidden.
 - A container's subdomain must be one DNS label (lowercase letters, digits,
   dashes): it is part of Traefik's label keys, where a dot or backtick could
   change other routes.

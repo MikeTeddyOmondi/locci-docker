@@ -147,7 +147,7 @@
 			</Table.Cell>
 			<Table.Cell class="hidden text-xs text-muted-foreground xl:table-cell">{c.Status}</Table.Cell>
 			<Table.Cell class="pr-4">
-				<ContainerActions state={c.State} busy={busy === c.Id} onaction={(a) => act(c, a)} />
+				<ContainerActions state={c.State} locked={c.LocciLocked} busy={busy === c.Id} onaction={(a) => act(c, a)} />
 			</Table.Cell>
 		{/snippet}
 		{#snippet card(c)}
@@ -167,7 +167,7 @@
 						</div>
 					{/if}
 				</div>
-				<ContainerActions state={c.State} busy={busy === c.Id} onaction={(a) => act(c, a)} />
+				<ContainerActions state={c.State} locked={c.LocciLocked} busy={busy === c.Id} onaction={(a) => act(c, a)} />
 			</div>
 		{/snippet}
 	</DataTable>

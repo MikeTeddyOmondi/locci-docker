@@ -103,13 +103,16 @@
 	const name = $derived(info?.Name?.replace(/^\//, ''));
 	const fmtDate = (s) => (!s || s.startsWith('0001') ? 'never' : new Date(s).toLocaleString());
 
-	const tabs = [
-		['overview', 'Overview', InfoIcon],
-		['logs', 'Logs', FileTextIcon],
-		['stats', 'Stats', ActivityIcon],
-		['console', 'Console', TerminalIcon],
-		['inspect', 'Inspect', BracesIcon]
-	];
+	// No Console tab where the user may not open one (the server refuses too).
+	const tabs = $derived(
+		[
+			['overview', 'Overview', InfoIcon],
+			['logs', 'Logs', FileTextIcon],
+			['stats', 'Stats', ActivityIcon],
+			['console', 'Console', TerminalIcon],
+			['inspect', 'Inspect', BracesIcon]
+		].filter(([value]) => value !== 'console' || !info?.LocciLocked)
+	);
 	const shells = ['sh', 'bash', 'ash'];
 
 	// CPU sparkline path in a 100x30 box.
@@ -143,7 +146,7 @@
 	<PageHeader kicker="Container · {shortId(info.Id)}" title={name}>
 		<StatusBadge {state} />
 		{#snippet actions()}
-			<ContainerActions {state} {busy} withKill size="default" onaction={act} />
+			<ContainerActions {state} {busy} locked={info.LocciLocked} withKill size="default" onaction={act} />
 		{/snippet}
 	</PageHeader>
 
