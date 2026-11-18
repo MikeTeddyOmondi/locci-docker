@@ -335,6 +335,9 @@ that is an API server, a web UI and a CLI.
   console, and their environment is hidden when inspected. The image carries
   the label, so the server and agents are protected. Admins are not limited;
   `LOCCI_USER_HOST_ACCESS=true` restores the old behaviour for everyone.
+- Dependencies with security fixes that still build with Go 1.24:
+  `go-jose/v4` 4.1.4, OpenTelemetry 1.41.0, `docker/docker` 28.3.3. The
+  remaining govulncheck findings need a newer Go (see `BACKLOG.md`).
 - A container's subdomain must be one DNS label (lowercase letters, digits,
   dashes): it is part of Traefik's label keys, where a dot or backtick could
   change other routes.
