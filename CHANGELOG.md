@@ -149,6 +149,11 @@ that is an API server, a web UI and a CLI.
   - Agent environments (in progress): a fourth kind, `agent`, for hosts
     that dial out to the server. Each has an agent token (`la_...`), stored
     only as a hash in `agent_tokens`; issuing a new one replaces the old.
+    `internal/tunnel` carries Docker connections over the agent's one
+    outbound WebSocket: yamux (`hashicorp/yamux`) multiplexes it, the
+    server's hub opens a stream per Docker connection, and the agent pipes
+    each stream into its local Docker socket (half-closing so exec and attach
+    end cleanly). A new agent for the same environment replaces the old one.
 
 - **Single sign-on with OIDC (in progress).**
   - Tables `oidc_providers` (client secret encrypted like environment keys),
