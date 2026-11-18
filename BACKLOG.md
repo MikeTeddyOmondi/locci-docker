@@ -188,6 +188,36 @@ shows up in the audit log.
 
 ---
 
+## 3. Security hardening
+
+From a review in November 2026. Done:
+
+- [x] plain users kept from host paths, Traefik and locci labels, other
+  containers' subdomains and protected containers (`LOCCI_USER_HOST_ACCESS`
+  lifts it)
+- [x] login rate limits and failed logins in the audit log
+- [x] token expiry after `LOCCI_TOKEN_TTL_DAYS` without use; list and revoke
+  sessions (API, CLI, web UI)
+- [x] security headers with a Content-Security-Policy; body limit; header
+  timeout; graceful shutdown
+- [x] forwarded headers only from `LOCCI_TRUSTED_PROXIES`; `?token=` only on
+  WebSockets; constant-time `AUTH_TOKEN`; same timing for unknown usernames
+- [x] dependency fixes that still build with Go 1.24 (go-jose, otel, docker)
+
+Open:
+
+- [ ] **Move off Go 1.24.** It no longer gets security releases, and
+  govulncheck lists standard library fixes (net/http, crypto/tls,
+  crypto/x509 and others) that only newer Go versions have. The
+  `golang.org/x/crypto` (SSH client DoS fixes) and `golang.org/x/net` (HTTP/2)
+  fixes also need Go 1.25 or 1.26.
+- [ ] Web token in an HttpOnly cookie instead of local storage, with CSRF
+  protection (the CSP limits the damage meanwhile)
+- [ ] CI running tests, `bun run check` and govulncheck on every push
+- [ ] Per-environment access for users (also in section 1)
+
+---
+
 ## Later
 
 Smaller or longer-term items from earlier design discussions:
