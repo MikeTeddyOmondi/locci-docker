@@ -2,7 +2,6 @@
 	// Interactive shell in a container over the exec WebSocket.
 	import { onMount } from 'svelte';
 	import '@xterm/xterm/css/xterm.css';
-	import { auth } from '$lib/api.js';
 	import { scope } from '$lib/env.svelte.js';
 
 	let { id, cmd = 'sh' } = $props();
@@ -30,7 +29,8 @@
 			fit.fit();
 
 			const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-			const q = new URLSearchParams({ cmd, token: auth.token });
+			// The session cookie goes with the handshake; the server checks Origin.
+			const q = new URLSearchParams({ cmd });
 			ws = new WebSocket(`${proto}://${location.host}/api/v1${scope(`/containers/${id}/exec/ws`)}?${q}`);
 			ws.binaryType = 'arraybuffer';
 

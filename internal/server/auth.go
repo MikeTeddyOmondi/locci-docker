@@ -26,6 +26,15 @@ func currentUser(c *gin.Context) store.User {
 // Authorization header or, for WebSockets (which can't set headers), ?token=.
 func (s *Server) auth(c *gin.Context) {
 	token, _ := strings.CutPrefix(c.GetHeader("Authorization"), "Bearer ")
+	viaCookie := false
+	if token == "" {
+		token = sessionToken(c)
+		viaCookie = token != ""
+	}
+	if viaCookie && !safeMethod(c.Request.Method) && c.GetHeader(csrfHeader) == "" {
+		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "missing " + csrfHeader + " header"})
+		return
+	}
 	if token == "" && websocket.IsWebSocketUpgrade(c.Request) {
 		// Only WebSockets: a token in any other URL ends up in browser
 		// history and proxy access logs.
@@ -36,6 +45,7 @@ func (s *Server) auth(c *gin.Context) {
 		return
 	}
 
+	c.Set("viaCookie", viaCookie)
 	if s.AuthToken != "" && subtle.ConstantTimeCompare([]byte(token), []byte(s.AuthToken)) == 1 {
 		c.Set("user", systemUser)
 		c.Next()
@@ -44,6 +54,9 @@ func (s *Server) auth(c *gin.Context) {
 
 	user, err := s.Store.UserByToken(token)
 	if err != nil {
+		if viaCookie {
+			s.clearSession(c)
+		}
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
 		return
 	}
@@ -76,6 +89,7 @@ func (s *Server) login(c *gin.Context) {
 	var req struct {
 		Username string `json:"username" binding:"required"`
 		Password string `json:"password" binding:"required"`
+		Cookie   bool   `json:"cookie"` // web UI: keep the token in the session cookie, not the body
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		s.fail(c, http.StatusBadRequest, err)
@@ -118,15 +132,20 @@ func (s *Server) login(c *gin.Context) {
 	}
 	_ = s.Store.Audit(user.Username, "POST", c.Request.URL.Path, http.StatusOK)
 
+	if req.Cookie {
+		s.setSession(c, token)
+		c.JSON(http.StatusOK, gin.H{"user": user})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"token": token, "user": user})
 }
 
 func (s *Server) logout(c *gin.Context) {
-	token, _ := strings.CutPrefix(c.GetHeader("Authorization"), "Bearer ")
-	if err := s.Store.DeleteToken(token); err != nil {
+	if err := s.Store.DeleteToken(c.GetString("token")); err != nil {
 		s.fail(c, http.StatusInternalServerError, err)
 		return
 	}
+	s.clearSession(c)
 	c.JSON(http.StatusOK, gin.H{"status": "logged out"})
 }
 

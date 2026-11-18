@@ -48,9 +48,11 @@ their reach.
 - A token expires after `LOCCI_TOKEN_TTL_DAYS` (default 30) without use. Users
   see and sign out their sessions in the web UI (user menu, Sessions) or with
   `locci sessions`.
-- The web UI keeps its token in the browser's local storage. The
-  Content-Security-Policy below is what stops injected scripts from reading
-  it; moving it to an HttpOnly cookie is in the backlog.
+- The web UI's token is an HttpOnly session cookie (`SameSite=Lax`, `Secure`
+  over HTTPS): page scripts can't read it. Requests that change something
+  must also carry an `X-Locci-CSRF` header, which other sites can't send
+  (locci allows no cross-origin requests), so a page elsewhere can't act
+  with the cookie. The console WebSocket checks the page's origin.
 - `AUTH_TOKEN` is an optional static admin token for integrations. Leave it
   empty unless you need it, and treat it like a root password. It is compared
   in constant time and never expires.

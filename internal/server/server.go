@@ -73,6 +73,7 @@ func (s *Server) Router(mode string) *gin.Engine {
 
 	api.GET("/auth/me", s.me)
 	api.POST("/auth/logout", s.logout)
+	api.POST("/auth/session", s.adoptSession)
 	api.GET("/auth/tokens", s.listTokens)
 	api.DELETE("/auth/tokens/:id", s.revokeToken)
 

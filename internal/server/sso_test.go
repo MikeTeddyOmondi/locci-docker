@@ -24,6 +24,13 @@ func browser() *http.Client {
 
 // signIn runs the whole flow and returns where it landed.
 func signIn(t *testing.T, startURL string) *url.URL {
+	u, _ := signInSession(t, startURL)
+	return u
+}
+
+// signInSession is signIn that also returns the session cookie the last
+// response set ("" if none).
+func signInSession(t *testing.T, startURL string) (*url.URL, string) {
 	t.Helper()
 	resp, err := browser().Get(startURL)
 	if err != nil {
@@ -34,7 +41,16 @@ func signIn(t *testing.T, startURL string) *url.URL {
 		t.Fatalf("expected a redirect at the end, got %d", resp.StatusCode)
 	}
 	u, _ := url.Parse(resp.Header.Get("Location"))
-	return u
+	session := ""
+	for _, ck := range resp.Cookies() {
+		if ck.Name == sessionCookie {
+			session = ck.Value
+			if !ck.HttpOnly || ck.SameSite != http.SameSiteLaxMode {
+				t.Errorf("session cookie flags: %+v", ck)
+			}
+		}
+	}
+	return u, session
 }
 
 func TestSSOFlow(t *testing.T) {
@@ -88,14 +104,15 @@ func TestSSOFlow(t *testing.T) {
 		t.Fatalf("enabled list: %v", out)
 	}
 
-	// Browser sign-in: lands on /login with the token in the fragment.
+	// Browser sign-in: the token arrives as the session cookie, and the
+	// fragment on /login only says it worked.
 	idp.SetUser(map[string]any{"sub": "u-7", "email": "kim@example.com", "email_verified": true, "groups": []string{"ops"}})
-	land := signIn(t, api+"/auth/oidc/fake/start")
+	land, session := signInSession(t, api+"/auth/oidc/fake/start")
 	frag, _ := url.ParseQuery(land.Fragment)
-	if land.Path != "/login" || frag.Get("token") == "" || land.RawQuery != "" {
-		t.Fatalf("landing: %s", land)
+	if land.Path != "/login" || frag.Get("signed_in") != "1" || frag.Get("token") != "" || session == "" || land.RawQuery != "" {
+		t.Fatalf("landing: %s (session cookie %t)", land, session != "")
 	}
-	code, me := call(t, "GET", api+"/auth/me", frag.Get("token"), nil)
+	code, me := call(t, "GET", api+"/auth/me", session, nil)
 	if code != 200 || me["username"] != "kim@example.com" || me["role"] != "admin" || me["has_password"] != false {
 		t.Fatalf("me: %d %v", code, me)
 	}

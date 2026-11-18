@@ -9,6 +9,11 @@ Base path: `/api/v1`. Requests and responses are JSON unless noted. Errors are
 Send a token as `Authorization: Bearer <token>`. WebSockets can't set headers,
 so the exec WebSocket also accepts `?token=<token>`; other requests don't.
 
+The web UI uses a session cookie instead (`locci_session`, HttpOnly,
+`SameSite=Lax`). With the cookie, every request other than GET must also send
+`X-Locci-CSRF: 1`, or it gets `403`; bearer tokens don't need it. The console
+WebSocket takes the cookie too, and only from the UI's own origin.
+
 A token expires after `LOCCI_TOKEN_TTL_DAYS` (default 30) without use; every
 use pushes the date back. An expired, revoked or unknown token gets 401.
 Failed password logins are rate limited (429 with `Retry-After`).
@@ -16,7 +21,8 @@ Failed password logins are rate limited (429 with `Retry-After`).
 Tokens come from:
 
 - `POST /api/v1/auth/login` with `{"username": "...", "password": "..."}`,
-  which returns `{"token": "lc_...", "user": {...}}`, or
+  which returns `{"token": "lc_...", "user": {...}}` (with `"cookie": true` it
+  sets the session cookie instead and returns only `user`), or
 - the static `AUTH_TOKEN`, if the server sets one (acts as an admin called
   `system`).
 
@@ -25,7 +31,8 @@ Tokens come from:
 | `GET /health` | none | `200 {"status":"healthy"}` when the default environment's Docker answers, else `503` |
 | `POST /auth/login` | none | password login |
 | `GET /auth/me` | user | the current user (with `has_password`: false for SSO-only users) |
-| `POST /auth/logout` | user | revokes the token |
+| `POST /auth/logout` | user | revokes the token and clears the session cookie |
+| `POST /auth/session` | user (bearer) | moves the bearer token into the session cookie (the web UI's one-time upgrade from local storage) |
 | `GET /auth/tokens` | user | the caller's sessions: `id`, `name`, `created_at`, `last_used_at`, `expires_at`, `current` (never the token) |
 | `DELETE /auth/tokens/:id` | user | signs out one of the caller's sessions |
 

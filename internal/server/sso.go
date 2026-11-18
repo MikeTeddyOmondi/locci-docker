@@ -94,11 +94,14 @@ func (s *Server) ssoDone(c *gin.Context, cliPort int, token string, err error) {
 		c.Redirect(http.StatusFound, fmt.Sprintf("http://127.0.0.1:%d/callback?%s", cliPort, q.Encode()))
 		return
 	}
+	// The browser gets the token as its session cookie; the fragment only
+	// says how it went.
 	frag := url.Values{}
 	if err != nil {
 		frag.Set("error", err.Error())
 	} else {
-		frag.Set("token", token)
+		s.setSession(c, token)
+		frag.Set("signed_in", "1")
 	}
 	c.Redirect(http.StatusFound, "/login#"+frag.Encode())
 }

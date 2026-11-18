@@ -13,7 +13,7 @@
 	import Logo from '$lib/components/Logo.svelte';
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 	import ConfirmHost from '$lib/components/ConfirmHost.svelte';
-	import { api, auth } from '$lib/api.js';
+	import { api, adoptLegacyToken } from '$lib/api.js';
 	import { session } from '$lib/session.svelte.js';
 	import { envs, loadEnvs } from '$lib/env.svelte.js';
 
@@ -22,19 +22,16 @@
 
 	const isLogin = $derived(page.url.pathname === '/login');
 
-	// Load the current user once a token exists; bounce to /login otherwise.
+	// Load the current user; without a valid session the API answers 401 and
+	// api() sends the browser to /login.
 	$effect(() => {
-		if (isLogin) return;
-		if (!auth.token) {
-			goto('/login');
-			return;
-		}
-		if (!session.user)
-			api('GET', '/auth/me')
-				.then((u) => {
-					session.user = u;
-				})
-				.catch(() => {});
+		if (isLogin || session.user) return;
+		adoptLegacyToken()
+			.then(() => api('GET', '/auth/me'))
+			.then((u) => {
+				session.user = u;
+			})
+			.catch(() => {});
 	});
 
 	// Environments (and their up/down dots) refresh on the server's 30s health cadence.
@@ -49,7 +46,6 @@
 
 	async function logout() {
 		await api('POST', '/auth/logout').catch(() => {});
-		auth.token = null;
 		session.user = null;
 		envs.list = [];
 		envs.loaded = false;

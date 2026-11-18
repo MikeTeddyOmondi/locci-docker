@@ -10,7 +10,7 @@
 	import CircleAlertIcon from '@lucide/svelte/icons/circle-alert';
 	import Logo from '$lib/components/Logo.svelte';
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
-	import { api, auth } from '$lib/api.js';
+	import { api } from '$lib/api.js';
 	import { session } from '$lib/session.svelte.js';
 
 	let username = $state('');
@@ -22,13 +22,12 @@
 	let methods = $state(null); // { password_login, providers: [{slug, display_name}] }
 
 	$effect(() => {
-		// Back from single sign-on: the token (or an error) is in the fragment,
-		// which browsers never send to servers. Take it and clean the URL.
+		// Back from single sign-on: the server set the session cookie, and the
+		// fragment says how it went. Clean the URL either way.
 		const back = new URLSearchParams(location.hash.slice(1));
-		if (back.has('token') || back.has('error')) {
+		if (back.has('signed_in') || back.has('error')) {
 			history.replaceState(null, '', location.pathname);
-			if (back.get('token')) {
-				auth.token = back.get('token');
+			if (back.get('signed_in')) {
 				session.user = null; // the layout loads it
 				goto('/');
 				return;
@@ -45,8 +44,7 @@
 		busy = true;
 		error = '';
 		try {
-			const res = await api('POST', '/auth/login', { username, password });
-			auth.token = res.token;
+			const res = await api('POST', '/auth/login', { username, password, cookie: true });
 			session.user = res.user;
 			goto('/');
 		} catch (err) {
