@@ -45,6 +45,9 @@ func Handler() http.Handler {
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-cache")
+		// Explicit: under gin's NoRoute the status is preset to 404, and
+		// client-side routes such as /login are real pages.
+		w.WriteHeader(http.StatusOK)
 		w.Write(index)
 	})
 }

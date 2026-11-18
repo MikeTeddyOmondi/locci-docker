@@ -276,6 +276,9 @@ that is an API server, a web UI and a CLI.
 
 ### Fixed
 
+- Web UI pages such as `/login` were served with HTTP status 404 (gin presets
+  it for unmatched routes) although the page itself loaded; they now return
+  200. Unknown `/api/` paths still answer a JSON 404.
 - Concurrent writes to a local SQLite database (audit log entries, health
   checks) could fail with `database is locked`. A `file:` database now uses a
   single connection so writes queue instead of failing.
