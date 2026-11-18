@@ -417,7 +417,7 @@
 					<pre class="overflow-x-auto rounded-md bg-muted p-3 whitespace-pre-wrap break-all">docker run -d --name locci-agent --restart unless-stopped \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -e LOCCI_AGENT_TOKEN={issued.token} \
-  &lt;locci image&gt; agent --server {server}</pre>
+  locci/docker agent --server {server}</pre>
 				</div>
 			</div>
 		{/if}

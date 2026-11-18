@@ -17,7 +17,7 @@ func printAgentSetup(server, token string) {
 	fmt.Printf("  LOCCI_AGENT_TOKEN=%s locci agent --server %s\n", token, server)
 	fmt.Printf("or in Docker:\n  docker run -d --name locci-agent --restart unless-stopped \\\n")
 	fmt.Printf("    -v /var/run/docker.sock:/var/run/docker.sock -e LOCCI_AGENT_TOKEN=%s \\\n", token)
-	fmt.Printf("    <locci image> agent --server %s\n", server)
+	fmt.Printf("    locci/docker agent --server %s\n", server)
 }
 
 type envInfo struct {

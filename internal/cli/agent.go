@@ -34,7 +34,7 @@ the server can manage this host without any open port. Create an "agent"
 environment on the server first; it gives you the token.`,
 		Example: `  LOCCI_AGENT_TOKEN=la_... locci agent --server https://locci.example.com
   docker run -d --restart unless-stopped -v /var/run/docker.sock:/var/run/docker.sock \
-    -e LOCCI_AGENT_TOKEN=la_... <image> agent --server https://locci.example.com`,
+    -e LOCCI_AGENT_TOKEN=la_... locci/docker agent --server https://locci.example.com`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if token == "" {
 				token = os.Getenv("LOCCI_AGENT_TOKEN")

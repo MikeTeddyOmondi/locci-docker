@@ -63,7 +63,7 @@ to the locci server.
    docker run -d --name locci-agent --restart unless-stopped \
      -v /var/run/docker.sock:/var/run/docker.sock \
      -e LOCCI_AGENT_TOKEN=la_... \
-     <locci image> agent --server https://locci.example.com
+     locci/docker agent --server https://locci.example.com
    ```
 
 3. Within seconds the environment shows as connected and works like any

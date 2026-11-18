@@ -27,7 +27,7 @@ docker run -d --name locci -p 8998:8998 \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v locci-data:/data \
   --env-file .env \
-  <image>:dev
+  locci/docker:dev
 ```
 
 `just docker-logs` follows the logs and `just down` removes the container
@@ -38,7 +38,7 @@ docker run -d --name locci -p 8998:8998 \
 ```yaml
 services:
   locci:
-    image: <image>:<tag>        # from `just image tag=<tag>`
+    image: locci/docker:<tag>   # from `just image tag=<tag>`
     restart: unless-stopped
     ports: ["8998:8998"]
     env_file: .env
@@ -60,7 +60,7 @@ The same image runs the outbound agent on a remote Docker host (see
 docker run -d --name locci-agent --restart unless-stopped \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -e LOCCI_AGENT_TOKEN=la_... \
-  <image> agent --server https://locci.example.com
+  locci/docker agent --server https://locci.example.com
 ```
 
 It needs no ports and no volume.

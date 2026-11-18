@@ -258,6 +258,8 @@ that is an API server, a web UI and a CLI.
 
 ### Changed
 
+- The Docker image is now `locci/docker` (Justfile `image`), and the docs, the
+  agent setup dialog and `locci env add --kind agent` use that name.
 - Code split from `cmd/main.go` into internal packages: `cli`, `client`,
   `config`, `docker`, `jobs`, `server`, `store`, `ui`. Entry point is now
   `cmd/locci`.

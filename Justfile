@@ -14,7 +14,7 @@ set dotenv-load
 set ignore-comments
 
 bin := "locci"
-image := "ranckosolutionsinc/locci"
+image := "locci/docker"
 
 # list recipes
 default:
