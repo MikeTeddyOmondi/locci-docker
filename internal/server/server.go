@@ -43,6 +43,9 @@ func (s *Server) Router(mode string) *gin.Engine {
 	r.POST("/api/v1/auth/oidc/:provider/device", s.ssoDeviceStart)
 	r.POST("/api/v1/auth/oidc/:provider/device/token", s.ssoDevicePoll)
 
+	// Outbound agents authenticate with their own token, not a user's.
+	r.GET("/api/v1/agent/connect", s.agentConnect)
+
 	api := r.Group("/api/v1", s.auth, s.audit)
 
 	api.GET("/auth/me", s.me)

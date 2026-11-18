@@ -17,12 +17,19 @@ import (
 // envView is what the API returns: never the secret, only whether one is set.
 type envView struct {
 	store.Environment
-	HasSecret   bool   `json:"has_secret"`
-	Fingerprint string `json:"ssh_fingerprint,omitempty"`
+	HasSecret      bool   `json:"has_secret"`
+	Fingerprint    string `json:"ssh_fingerprint,omitempty"`
+	AgentConnected *bool  `json:"agent_connected,omitempty"` // agent environments only, live
+	AgentToken     string `json:"agent_token,omitempty"`     // only right after it is issued
 }
 
-func view(e store.Environment) envView {
-	return envView{Environment: e, HasSecret: e.HasSecret(), Fingerprint: env.Fingerprint(e.SSHHostKey)}
+func (s *Server) view(e store.Environment) envView {
+	v := envView{Environment: e, HasSecret: e.HasSecret(), Fingerprint: env.Fingerprint(e.SSHHostKey)}
+	if e.Kind == store.KindAgent {
+		on := s.Envs.Hub != nil && s.Envs.Hub.Connected(e.ID)
+		v.AgentConnected = &on
+	}
+	return v
 }
 
 // envRequest is the body for create, update and test. TLSKey and SSHKey are
@@ -36,8 +43,9 @@ type envRequest struct {
 	TLSCert      string            `json:"tls_cert"`
 	TLSKey       string            `json:"tls_key"`
 	SSHKey       string            `json:"ssh_key"`
-	SSHHostKey   string            `json:"ssh_host_key"`   // from a previous test, to pin
-	ResetHostKey bool              `json:"reset_host_key"` // update only: forget the pinned key
+	SSHHostKey   string            `json:"ssh_host_key"`       // from a previous test, to pin
+	ResetHostKey bool              `json:"reset_host_key"`     // update only: forget the pinned key
+	RotateToken  bool              `json:"rotate_agent_token"` // update only: issue a new agent token
 	Labels       map[string]string `json:"labels"`
 }
 
@@ -87,7 +95,7 @@ func (s *Server) listEnvironments(c *gin.Context) {
 	}
 	out := make([]envView, len(list))
 	for i, e := range list {
-		out[i] = view(e)
+		out[i] = s.view(e)
 	}
 	c.JSON(http.StatusOK, gin.H{"environments": out})
 }
@@ -98,7 +106,7 @@ func (s *Server) getEnvironment(c *gin.Context) {
 		s.fail(c, notFoundOr500(err), err)
 		return
 	}
-	c.JSON(http.StatusOK, view(e))
+	c.JSON(http.StatusOK, s.view(e))
 }
 
 func notFoundOr500(err error) int {
@@ -120,6 +128,10 @@ func (s *Server) testEnvironment(c *gin.Context) {
 	var req envRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		s.fail(c, http.StatusBadRequest, err)
+		return
+	}
+	if req.Kind == store.KindAgent {
+		c.JSON(http.StatusOK, gin.H{"ok": false, "error": "an agent environment connects to the server itself: save it, run `locci agent` on the host, and watch its status"})
 		return
 	}
 	e, key := req.environment(), req.key(req.Kind)
@@ -195,8 +207,16 @@ func (s *Server) createEnvironment(c *gin.Context) {
 		s.fail(c, http.StatusBadRequest, err)
 		return
 	}
+	v := s.view(saved)
+	if saved.Kind == store.KindAgent {
+		// Shown once: only its hash is kept.
+		if v.AgentToken, err = s.issueAgentToken(saved); err != nil {
+			s.fail(c, http.StatusInternalServerError, err)
+			return
+		}
+	}
 	s.checkSoon(saved)
-	c.JSON(http.StatusCreated, view(saved))
+	c.JSON(http.StatusCreated, v)
 }
 
 func (s *Server) updateEnvironment(c *gin.Context) {
@@ -249,7 +269,7 @@ func (s *Server) updateEnvironment(c *gin.Context) {
 		s.sealFailure(c, err)
 		return
 	}
-	if e.Kind != store.KindLocal {
+	if e.Kind != store.KindLocal && e.Kind != store.KindAgent {
 		o, err := s.Envs.PlainOptions(e, key)
 		if err == nil {
 			err = checkOptions(o)
@@ -265,8 +285,16 @@ func (s *Server) updateEnvironment(c *gin.Context) {
 		s.fail(c, http.StatusBadRequest, err)
 		return
 	}
+	v := s.view(saved)
+	if req.RotateToken {
+		if v.AgentToken, err = s.issueAgentToken(saved); err != nil {
+			s.fail(c, http.StatusBadRequest, err)
+			return
+		}
+		v = s.withToken(saved, v.AgentToken)
+	}
 	s.checkSoon(saved)
-	c.JSON(http.StatusOK, view(saved))
+	c.JSON(http.StatusOK, v)
 }
 
 func (s *Server) deleteEnvironment(c *gin.Context) {
@@ -280,6 +308,9 @@ func (s *Server) deleteEnvironment(c *gin.Context) {
 		return
 	}
 	s.Envs.Forget(e.ID)
+	if s.Envs.Hub != nil {
+		s.Envs.Hub.Disconnect(e.ID)
+	}
 	c.JSON(http.StatusOK, gin.H{"deleted": e.Name})
 }
 
@@ -289,7 +320,15 @@ func (s *Server) setDefaultEnvironment(c *gin.Context) {
 		return
 	}
 	e, _ := s.Store.EnvironmentByName(c.Param("env"))
-	c.JSON(http.StatusOK, view(e))
+	c.JSON(http.StatusOK, s.view(e))
+}
+
+// withToken is the view of e with a freshly issued agent token attached (the
+// rotation dropped the agent, so connected is recomputed).
+func (s *Server) withToken(e store.Environment, token string) envView {
+	v := s.view(e)
+	v.AgentToken = token
+	return v
 }
 
 // checkSoon refreshes an environment's status in the background so the UI

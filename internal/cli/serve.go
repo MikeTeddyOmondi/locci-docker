@@ -16,6 +16,7 @@ import (
 	"github.com/MikeTeddyOmondi/locci-docker/internal/server"
 	"github.com/MikeTeddyOmondi/locci-docker/internal/sso"
 	"github.com/MikeTeddyOmondi/locci-docker/internal/store"
+	"github.com/MikeTeddyOmondi/locci-docker/internal/tunnel"
 )
 
 func serveCmd() *cobra.Command {
@@ -50,7 +51,7 @@ func serveCmd() *cobra.Command {
 			}
 
 			// One Docker connection per environment, checked every 30s for the UI.
-			envs := &env.Registry{Store: db, Box: box, DockerHost: cfg.DockerHost, Domain: cfg.TraefikDomain, Log: log}
+			envs := &env.Registry{Store: db, Box: box, DockerHost: cfg.DockerHost, Domain: cfg.TraefikDomain, Hub: &tunnel.Hub{}, Log: log}
 			defer envs.Close()
 			go envs.Run(context.Background(), 30*time.Second)
 

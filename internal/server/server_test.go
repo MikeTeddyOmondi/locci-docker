@@ -14,6 +14,7 @@ import (
 	"github.com/MikeTeddyOmondi/locci-docker/internal/secret"
 	"github.com/MikeTeddyOmondi/locci-docker/internal/sso"
 	"github.com/MikeTeddyOmondi/locci-docker/internal/store"
+	"github.com/MikeTeddyOmondi/locci-docker/internal/tunnel"
 )
 
 func newTestServer(t *testing.T) (*httptest.Server, *store.Store) {
@@ -35,7 +36,7 @@ func newTestServerWithKey(t *testing.T, box *secret.Box) (*httptest.Server, *sto
 	if _, err := db.CreateEnvironment(store.Environment{Name: "local", Kind: store.KindLocal, URL: "tcp://127.0.0.1:1"}); err != nil {
 		t.Fatal(err)
 	}
-	envs := &env.Registry{Store: db, Box: box, Domain: "example.test", Log: log}
+	envs := &env.Registry{Store: db, Box: box, Domain: "example.test", Hub: &tunnel.Hub{}, Log: log}
 	t.Cleanup(envs.Close)
 
 	s := &Server{Envs: envs, SSO: &sso.Service{Store: db, Box: box, Log: log}, Store: db, AuthToken: "static", Log: log}

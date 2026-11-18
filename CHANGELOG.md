@@ -154,6 +154,15 @@ that is an API server, a web UI and a CLI.
     server's hub opens a stream per Docker connection, and the agent pipes
     each stream into its local Docker socket (half-closing so exec and attach
     end cleanly). A new agent for the same environment replaces the old one.
+    `GET /api/v1/agent/connect` takes the agent token as a Bearer header,
+    upgrades to the WebSocket, tells the agent its environment name
+    (`X-Locci-Environment`) and attaches the tunnel; connects and disconnects
+    are audited. Creating an agent environment returns its token once;
+    `PATCH {"rotate_agent_token": true}` issues a new one and drops the
+    connected agent; deleting the environment drops it too. Environments of
+    this kind report `agent_connected` live, and requests while no agent is
+    connected say so instead of a generic Docker error (custom dialers now
+    report their real error, as SSH already did).
 
 - **Single sign-on with OIDC (in progress).**
   - Tables `oidc_providers` (client secret encrypted like environment keys),
