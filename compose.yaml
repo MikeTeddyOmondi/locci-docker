@@ -9,7 +9,7 @@
 # they are what the container needs, whatever .env says for running on the host.
 services:
   locci:
-    image: ${LOCCI_IMAGE:-locci/docker:dev}
+    image: ${LOCCI_IMAGE:-locci/docker:latest}
     build: .
     restart: unless-stopped
     ports:

@@ -155,13 +155,13 @@ install:
 
 # build the Docker image
 [group('docker')]
-image tag="dev":
+image tag="latest":
     # multi-stage build: web UI, Go binary, slim runtime
     docker build -t {{ image }}:{{ tag }} .
 
 # run the image with the host's Docker socket and a data volume
 [group('docker')]
-up tag="dev":
+up tag="latest":
     # socket = manage host containers, volume = keep the database
     docker run -d --name {{ bin }} -p 8998:8998 \
       -v /var/run/docker.sock:/var/run/docker.sock \
@@ -186,7 +186,7 @@ docker-logs:
 
 # build the image from the current source and start it with compose.yaml
 [group('docker')]
-compose-up tag="dev":
+compose-up tag="latest":
     # --build keeps the container in step with the code (cached layers make it quick)
     LOCCI_IMAGE={{ image }}:{{ tag }} docker compose up -d --build
     @echo "open http://localhost:${LOCCI_PORT:-8998}"

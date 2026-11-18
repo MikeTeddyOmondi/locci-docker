@@ -27,7 +27,7 @@ docker run -d --name locci -p 8998:8998 \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v locci-data:/data \
   --env-file .env \
-  locci/docker:dev
+  locci/docker:latest
 ```
 
 `just docker-logs` follows the logs and `just down` removes the container
