@@ -86,11 +86,23 @@ func (s *Server) login(c *gin.Context) {
 		return
 	}
 
+	// Slow down guessing: per client IP, and per username from anywhere.
+	lim, ip, name := s.limits(), c.ClientIP(), strings.ToLower(req.Username)
+	if d := max(lim.loginIP.wait(ip), lim.loginUser.wait(name)); d > 0 {
+		_ = s.Store.Audit(req.Username, "POST", c.Request.URL.Path, http.StatusTooManyRequests)
+		tooMany(c, d)
+		return
+	}
+
 	user, err := s.Store.CheckPassword(req.Username, req.Password)
 	if err != nil {
+		lim.loginIP.add(ip)
+		lim.loginUser.add(name)
+		_ = s.Store.Audit(req.Username, "POST", c.Request.URL.Path, http.StatusUnauthorized)
 		s.fail(c, http.StatusUnauthorized, errors.New("wrong username or password"))
 		return
 	}
+	lim.loginUser.clear(name)
 
 	token, err := s.Store.NewToken(user.ID, c.GetHeader("User-Agent"))
 	if err != nil {

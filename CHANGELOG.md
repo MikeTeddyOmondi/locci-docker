@@ -318,6 +318,10 @@ that is an API server, a web UI and a CLI.
   no longer carry tokens into browser history and proxy logs.
 - `AUTH_TOKEN` is compared in constant time, and a login for an unknown user
   takes as long as a wrong password, so timing doesn't reveal usernames.
+- Password login is rate limited: after 10 failures from one IP, or 20 for one
+  username from anywhere, within 15 minutes, logins answer 429 with
+  `Retry-After` until the window ends. The SSO device-flow endpoints allow 30
+  requests a minute per IP. Failed and refused logins are in the audit log.
 
 ### Notes
 

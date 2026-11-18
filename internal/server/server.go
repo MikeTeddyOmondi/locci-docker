@@ -33,6 +33,8 @@ type Server struct {
 
 	proxyOnce sync.Once
 	proxyNets []*net.IPNet
+	limitOnce sync.Once
+	lim       *limits
 }
 
 // Router builds the gin engine with every route.
@@ -56,8 +58,9 @@ func (s *Server) Router(mode string) *gin.Engine {
 	r.GET("/api/v1/auth/providers", s.authProviders)
 	r.GET("/api/v1/auth/oidc/:provider/start", s.ssoStart)
 	r.GET("/api/v1/auth/oidc/:provider/callback", s.ssoCallback)
-	r.POST("/api/v1/auth/oidc/:provider/device", s.ssoDeviceStart)
-	r.POST("/api/v1/auth/oidc/:provider/device/token", s.ssoDevicePoll)
+	device := rateLimit(func() *limiter { return s.limits().device })
+	r.POST("/api/v1/auth/oidc/:provider/device", device, s.ssoDeviceStart)
+	r.POST("/api/v1/auth/oidc/:provider/device/token", device, s.ssoDevicePoll)
 
 	// Outbound agents authenticate with their own token, not a user's.
 	r.GET("/api/v1/agent/connect", s.agentConnect)
