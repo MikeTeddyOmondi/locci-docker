@@ -4,17 +4,36 @@
 #   just compose-logs    follow the logs
 #   just compose-down    stop (the database volume is kept)
 #
+# Identity providers for trying single sign-on, off unless you ask for them:
+#
+#   just compose-up keycloak     or: docker compose --profile keycloak up -d
+#   just compose-up pocket-id    or: docker compose --profile pocket-id up -d
+#
 # .env is optional and is read for settings such as LOCCI_SECRET_KEY,
 # AUTH_TOKEN or RABBITMQ_URL. The values under `environment` win over it:
 # they are what the container needs, whatever .env says for running on the host.
+#
+# locci and the identity providers share one network namespace, held by the
+# small `net` service (like a Kubernetes pod). So http://localhost:8180 is
+# Keycloak both for your browser and for locci, and an issuer URL works from
+# both sides. Ports are published on `net`, and rebuilding locci doesn't
+# disturb the others. See docs/DOCKER.md.
 services:
+  net:
+    image: registry.k8s.io/pause:3.10
+    restart: unless-stopped
+    ports:
+      - "${LOCCI_PORT:-8998}:8998"
+      - "${KEYCLOAK_PORT:-8180}:${KEYCLOAK_PORT:-8180}"
+      - "${POCKET_ID_PORT:-1411}:${POCKET_ID_PORT:-1411}"
+
   locci:
     image: ${LOCCI_IMAGE:-locci/docker:latest}
     build: .
+    network_mode: service:net
+    depends_on: [net]
     restart: unless-stopped
     stop_grace_period: 30s # time to finish running requests and a deploy job
-    ports:
-      - "${LOCCI_PORT:-8998}:8998"
     env_file:
       - path: .env
         required: false
@@ -27,6 +46,42 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - locci-data:/data
 
+  # Keycloak in development mode, for trying SSO locally (docs/oidc/KEYCLOAK.md).
+  # Admin console: http://localhost:8180, admin / change-me unless set in .env.
+  keycloak:
+    profiles: ["keycloak"]
+    image: quay.io/keycloak/keycloak:26.0.7
+    command: ["start-dev"]
+    network_mode: service:net
+    depends_on: [net]
+    restart: unless-stopped
+    environment:
+      KC_HTTP_PORT: "${KEYCLOAK_PORT:-8180}"
+      KC_HOSTNAME: "http://localhost:${KEYCLOAK_PORT:-8180}"
+      KC_BOOTSTRAP_ADMIN_USERNAME: "${KEYCLOAK_ADMIN:-admin}"
+      KC_BOOTSTRAP_ADMIN_PASSWORD: "${KEYCLOAK_ADMIN_PASSWORD:-change-me}"
+    volumes:
+      - keycloak-data:/opt/keycloak/data
+
+  # Pocket ID (passkeys only), for trying SSO locally (docs/oidc/POCKETID.md).
+  # First run: http://localhost:1411/setup creates the admin and its passkey.
+  pocket-id:
+    profiles: ["pocket-id"]
+    image: ghcr.io/pocket-id/pocket-id:v1.16.0
+    network_mode: service:net
+    depends_on: [net]
+    restart: unless-stopped
+    environment:
+      APP_URL: "http://localhost:${POCKET_ID_PORT:-1411}"
+      PORT: "${POCKET_ID_PORT:-1411}"
+      # Encrypts Pocket ID's keys. The default is for local trials only; set
+      # POCKET_ID_ENCRYPTION_KEY in .env (openssl rand -base64 32) to keep one.
+      ENCRYPTION_KEY: "${POCKET_ID_ENCRYPTION_KEY:-local-trial-only-not-a-secret-key}"
+    volumes:
+      - pocket-id-data:/app/data
+
 volumes:
   locci-data:
     name: locci-data # the same volume `just up` uses, so both see one database
+  keycloak-data:
+  pocket-id-data:

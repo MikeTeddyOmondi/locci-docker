@@ -12,6 +12,10 @@ that is an API server, a web UI and a CLI.
 
 ### Added
 
+- **Compose profiles for Keycloak and Pocket ID.** `just compose-up keycloak`
+  (or `pocket-id`) starts a provider next to locci for trying single sign-on.
+  They share a network held by a small `net` service, so `localhost` issuer
+  URLs work for the browser and for locci alike (`docs/DOCKER.md`).
 - **Dual license.** locci is available under the MIT license
   (`MIT-LICENSE.md`) or the Apache License 2.0 (`APACHE-LICENSE.md`), at your
   option.
