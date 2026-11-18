@@ -26,6 +26,9 @@
 	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import FormDialog from '$lib/components/FormDialog.svelte';
+	import EnvAccessDialog from '$lib/components/EnvAccessDialog.svelte';
+	import UsersIcon from '@lucide/svelte/icons/users';
+	import LockIcon from '@lucide/svelte/icons/lock';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import { api, get, post, del } from '$lib/api.js';
 	import { bytes, ago } from '$lib/format.js';
@@ -33,6 +36,13 @@
 	import { envs, loadEnvs, statusTone } from '$lib/env.svelte.js';
 
 	const isAdmin = $derived(session.user?.role === 'admin');
+
+	let accessOpen = $state(false);
+	let accessEnv = $state(null);
+	function openAccess(e) {
+		accessEnv = e;
+		accessOpen = true;
+	}
 	const patch = (path, body) => api('PATCH', path, body);
 
 	// Host details per environment name: undefined = loading, null = unavailable.
@@ -218,6 +228,7 @@
 								<DropdownMenu.Content align="end" class="w-48">
 									<DropdownMenu.Item onclick={() => goto(`/e/${encodeURIComponent(e.name)}`)}><ServerIcon /> Open</DropdownMenu.Item>
 									<DropdownMenu.Item onclick={() => openEdit(e)}><PencilIcon /> Edit</DropdownMenu.Item>
+									<DropdownMenu.Item onclick={() => openAccess(e)}><UsersIcon /> Access</DropdownMenu.Item>
 									{#if e.kind === 'agent'}
 										<DropdownMenu.Item onclick={() => rotate(e)}><KeyRoundIcon /> Rotate agent token</DropdownMenu.Item>
 									{/if}
@@ -237,6 +248,11 @@
 
 				<div class="flex flex-wrap items-center gap-1.5 px-4 text-xs text-muted-foreground">
 					<Badge variant="outline" class="font-mono">{e.kind}</Badge>
+					{#if e.access?.restricted}
+						<Badge variant="secondary" class="gap-1" title={e.access.users.length ? e.access.users.join(', ') : 'Admins only'}>
+							<LockIcon class="size-3" />{e.access.users.length ? `${e.access.users.length} user${e.access.users.length === 1 ? '' : 's'}` : 'admins'}
+						</Badge>
+					{/if}
 					<span class="truncate font-mono" title={where(e)}>{where(e)}</span>
 				</div>
 
@@ -426,3 +442,5 @@
 		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>
+
+<EnvAccessDialog bind:open={accessOpen} env={accessEnv} onsaved={() => loadEnvs()} />

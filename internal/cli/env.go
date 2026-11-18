@@ -57,7 +57,7 @@ func envCmd() *cobra.Command {
   locci env use edge          # later commands run against edge
   locci ps -E local           # one command against another environment`,
 	}
-	cmd.AddCommand(envLsCmd(), envAddCmd(), envEditCmd(), envRmCmd(), envTestCmd(), envUseCmd(), envDefaultCmd())
+	cmd.AddCommand(envLsCmd(), envAddCmd(), envEditCmd(), envRmCmd(), envTestCmd(), envUseCmd(), envDefaultCmd(), envAccessCmd())
 	return cmd
 }
 

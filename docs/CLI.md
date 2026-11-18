@@ -69,6 +69,7 @@ locci env edit NAME [--label TEXT] [--url URL] [--ssh-key FILE] [--tls-* FILE]
 locci env test [NAME]              # reachable? prints Docker version, OS, CPUs, memory
 locci env use NAME | --clear
 locci env default NAME             # make it the server default (admin)
+locci env access NAME [--users ann,bob | --admins-only | --everyone]  # who may use it (admin)
 locci env rm NAME                  # admin; the host itself is not touched
 ```
 

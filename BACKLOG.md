@@ -91,7 +91,8 @@ TLS keys and other secrets are encrypted at rest with AES-GCM using
 - [x] UI: switcher, environments page, add/test dialog, env-aware routes
 - [x] CLI: `env` commands, `-E/--environment` flag, saved default
 - [x] tests: registry, routing, backward-compatible routes
-- [ ] later: per-environment access for users (`environment_users`)
+- [x] per-environment access for users (`environment_users` and an
+  `access_restricted` flag; API, CLI and an Access dialog)
 - [x] `agent` connection type (outbound tunnel over one WebSocket, yamux)
 
 **Done when:** an admin can add a remote host over TLS or SSH, test it,
@@ -210,9 +211,8 @@ From a review in November 2026. Done:
 - [x] container actions only in the options menu, disabled with the reason
   for protected containers; the username lockout spares known addresses
 
-Open:
-
-- [ ] Per-environment access for users (also in section 1)
+Nothing open; the move to `github.com/moby/moby/client` (under Later) would
+retire the two entries in `.govulncheck-ignore`.
 
 ---
 

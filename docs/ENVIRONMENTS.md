@@ -169,9 +169,30 @@ next request.
 - **Remove** forgets the host and its stored keys; nothing on the host is
   touched. The default can't be removed until another one is the default.
 
-Only admins can add, edit, remove or change the default. Every signed-in user
-can see and use every environment (per-environment permissions are in the
-backlog).
+Only admins can add, edit, remove or change the default.
+
+## Who can use an environment
+
+An environment is open to every signed-in user until an admin restricts it;
+then only the users on its list (and every admin) can see or use it. For
+anyone else it doesn't exist: it's missing from the switcher and
+`locci env ls`, and its routes answer 404. If the default environment is
+restricted, the original routes (`/api/v1/containers`, ...) answer 403 for
+users without access.
+
+- **Web UI:** Environments, the environment's menu, **Access**. A lock badge
+  on the card shows a restricted one.
+- **CLI:**
+  ```sh
+  locci env access prod                    # show
+  locci env access prod --users ann,bob    # only ann and bob (and admins)
+  locci env access prod --admins-only
+  locci env access prod --everyone
+  ```
+
+Removing the last listed user leaves an environment admin-only; it never
+opens up by itself. Deploy jobs and agents aren't affected: they don't act as
+a user.
 
 ## Deploy jobs
 

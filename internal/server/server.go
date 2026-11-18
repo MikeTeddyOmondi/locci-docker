@@ -94,6 +94,7 @@ func (s *Server) Router(mode string) *gin.Engine {
 	envAdmin.PATCH("/:env", s.updateEnvironment)
 	envAdmin.DELETE("/:env", s.deleteEnvironment)
 	envAdmin.POST("/:env/default", s.setDefaultEnvironment)
+	envAdmin.PUT("/:env/access", s.setEnvironmentAccess)
 
 	// The same routes for a chosen environment: /api/v1/environments/:env/...
 	scoped := api.Group("/environments/:env", s.useEnv)

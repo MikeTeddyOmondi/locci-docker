@@ -185,6 +185,9 @@ func (s *Store) DeleteEnvironment(name string) error {
 	if _, err := s.DB.Exec(`DELETE FROM agent_tokens WHERE environment_id = ?`, e.ID); err != nil {
 		return err
 	}
+	if _, err := s.DB.Exec(`DELETE FROM environment_users WHERE environment_id = ?`, e.ID); err != nil {
+		return err
+	}
 	_, err = s.DB.Exec(`DELETE FROM environments WHERE id = ?`, e.ID)
 	return err
 }

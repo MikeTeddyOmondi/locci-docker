@@ -24,6 +24,9 @@ volumes, but are kept from the hosts themselves:
   (Traefik, Portainer, CI runners). Inspecting one hides its environment
   variables.
 
+Admins can also limit an environment to chosen users (`locci env access`,
+or Access on the Environments page); others then can't see or use it at all.
+
 Admins can still do all of that. `LOCCI_USER_HOST_ACCESS=true` lifts the
 limits for everyone, for teams where every user is trusted with the hosts.
 

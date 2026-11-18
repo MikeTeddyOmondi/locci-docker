@@ -81,6 +81,7 @@ Responses never include keys, only `has_secret`.
 | `PATCH /environments/:env` | admin | update; empty fields and missing keys are kept |
 | `DELETE /environments/:env` | admin | `409` for the default |
 | `POST /environments/:env/default` | admin | make it the default |
+| `PUT /environments/:env/access` | admin | who may use it: `{"restricted": true, "users": ["ann"]}`, `{"restricted": true, "users": []}` (admins only) or `{"restricted": false}` (everyone); answers the new settings. Admins see them as `access` on each environment |
 | `POST /environments/test` | admin | try settings without saving; always `200` with `{"ok": true, "host": {...}}` or `{"ok": false, "error": "..."}` |
 
 Create, update and test body:

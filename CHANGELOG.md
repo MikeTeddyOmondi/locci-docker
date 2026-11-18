@@ -369,6 +369,13 @@ that is an API server, a web UI and a CLI.
   30 seconds so proxies don't close it; log streams send
   `X-Accel-Buffering: no`; `100.64.0.0/10` (NetBird, Tailscale) is trusted
   by default. New guide: `docs/REVERSE_PROXY.md`.
+- Per-environment access: an admin can limit an environment to chosen users
+  (or admins only) with `PUT /environments/:env/access`,
+  `locci env access NAME --users ann,bob | --admins-only | --everyone`, or
+  Access in the Environments page menu. Others don't see it in lists and get
+  404 on its routes (403 on the original routes when it's the default).
+  Environments stay open to everyone until restricted, and removing the last
+  listed user leaves one admin-only rather than open.
 - Container actions live in one options menu (list rows, cards and the
   container page) instead of a Stop/Start button beside it; the menu lists
   what fits the state and shows a spinner while an action runs. For plain

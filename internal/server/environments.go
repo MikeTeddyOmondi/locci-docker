@@ -17,10 +17,11 @@ import (
 // envView is what the API returns: never the secret, only whether one is set.
 type envView struct {
 	store.Environment
-	HasSecret      bool   `json:"has_secret"`
-	Fingerprint    string `json:"ssh_fingerprint,omitempty"`
-	AgentConnected *bool  `json:"agent_connected,omitempty"` // agent environments only, live
-	AgentToken     string `json:"agent_token,omitempty"`     // only right after it is issued
+	HasSecret      bool          `json:"has_secret"`
+	Fingerprint    string        `json:"ssh_fingerprint,omitempty"`
+	AgentConnected *bool         `json:"agent_connected,omitempty"` // agent environments only, live
+	AgentToken     string        `json:"agent_token,omitempty"`     // only right after it is issued
+	Access         *store.Access `json:"access,omitempty"`          // admins only: who may use it
 }
 
 func (s *Server) view(e store.Environment) envView {
@@ -93,20 +94,68 @@ func (s *Server) listEnvironments(c *gin.Context) {
 		s.fail(c, http.StatusInternalServerError, err)
 		return
 	}
-	out := make([]envView, len(list))
-	for i, e := range list {
-		out[i] = s.view(e)
+	admin := currentUser(c).IsAdmin()
+	out := make([]envView, 0, len(list))
+	for _, e := range list {
+		if !s.canUse(c, e) {
+			continue // not theirs: not even in the list
+		}
+		v := s.view(e)
+		if admin {
+			v.Access = s.access(e)
+		}
+		out = append(out, v)
 	}
 	c.JSON(http.StatusOK, gin.H{"environments": out})
 }
 
 func (s *Server) getEnvironment(c *gin.Context) {
 	e, err := s.Store.EnvironmentByName(c.Param("env"))
+	if err == nil && !s.canUse(c, e) {
+		err = store.ErrNotFound // as if it didn't exist
+	}
 	if err != nil {
 		s.fail(c, notFoundOr500(err), err)
 		return
 	}
-	c.JSON(http.StatusOK, s.view(e))
+	v := s.view(e)
+	if currentUser(c).IsAdmin() {
+		v.Access = s.access(e)
+	}
+	c.JSON(http.StatusOK, v)
+}
+
+// access is e's access settings for an admin's view (nil if unreadable).
+func (s *Server) access(e store.Environment) *store.Access {
+	a, err := s.Store.EnvironmentAccess(e.ID)
+	if err != nil {
+		return nil
+	}
+	return &a
+}
+
+// setEnvironmentAccess sets who may use an environment (admin).
+//
+//	PUT /api/v1/environments/:env/access
+//	{"restricted": true, "users": ["ann", "bob"]}   only these (and admins)
+//	{"restricted": true, "users": []}               admins only
+//	{"restricted": false}                           every signed-in user
+func (s *Server) setEnvironmentAccess(c *gin.Context) {
+	var req store.Access
+	if err := c.ShouldBindJSON(&req); err != nil {
+		s.fail(c, http.StatusBadRequest, err)
+		return
+	}
+	e, err := s.Store.EnvironmentByName(c.Param("env"))
+	if err != nil {
+		s.fail(c, notFoundOr500(err), err)
+		return
+	}
+	if err := s.Store.SetEnvironmentAccess(e.ID, req.Restricted, req.Users); err != nil {
+		s.fail(c, notFoundOr500(err), err)
+		return
+	}
+	c.JSON(http.StatusOK, s.access(e))
 }
 
 func notFoundOr500(err error) int {

@@ -129,6 +129,13 @@ var schema = []string{
 		token_hash     TEXT NOT NULL UNIQUE,
 		created_at     TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 	)`,
+	// Who may use an environment whose access_restricted is set (see
+	// access.go); admins always may.
+	`CREATE TABLE IF NOT EXISTS environment_users (
+		environment_id INTEGER NOT NULL REFERENCES environments(id),
+		user_id        INTEGER NOT NULL REFERENCES users(id),
+		PRIMARY KEY (environment_id, user_id)
+	)`,
 	`CREATE TABLE IF NOT EXISTS settings (
 		key   TEXT PRIMARY KEY,
 		value TEXT NOT NULL
@@ -141,6 +148,8 @@ var schema = []string{
 var addedColumns = []struct{ add, then string }{
 	// Tokens from before expiry existed start their 30 days at the upgrade.
 	{`ALTER TABLE tokens ADD COLUMN last_used_at TEXT`, `UPDATE tokens SET last_used_at = CURRENT_TIMESTAMP`},
+	// Environments start open to every signed-in user, as before.
+	{`ALTER TABLE environments ADD COLUMN access_restricted INTEGER NOT NULL DEFAULT 0`, ""},
 }
 
 // Open connects and creates the tables if needed.
@@ -265,6 +274,9 @@ func (s *Store) DeleteUser(username string) error {
 		return err
 	}
 	if _, err := s.DB.Exec(`DELETE FROM user_identities WHERE user_id = ?`, u.ID); err != nil {
+		return err
+	}
+	if _, err := s.DB.Exec(`DELETE FROM environment_users WHERE user_id = ?`, u.ID); err != nil {
 		return err
 	}
 	_, err = s.DB.Exec(`DELETE FROM users WHERE id = ?`, u.ID)
