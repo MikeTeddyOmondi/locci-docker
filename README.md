@@ -1,4 +1,4 @@
-# locci
+# Locci Docker
 
 A self-hosted Docker manager: API server, web UI and CLI in **one Go binary**.
 Manage the local Docker host and any number of remote ones over TLS or SSH.
