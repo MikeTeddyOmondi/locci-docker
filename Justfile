@@ -167,6 +167,9 @@ up tag="dev":
       -v /var/run/docker.sock:/var/run/docker.sock \
       -v locci-data:/data \
       --env-file .env \
+      -e DATABASE_URL=file:/data/locci.db \
+      -e DOCKER_HOST=unix:///var/run/docker.sock \
+      -e SERVER_PORT=8998 -e GIN_MODE=release \
       {{ image }}:{{ tag }}
 
 # stop and remove the container

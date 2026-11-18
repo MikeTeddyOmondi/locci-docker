@@ -276,6 +276,11 @@ that is an API server, a web UI and a CLI.
 
 ### Fixed
 
+- `just up` passed `.env` into the container unchanged, so a host-style
+  `DATABASE_URL=file:locci.db` put the database outside the `/data` volume and
+  a host `DOCKER_HOST` (such as a Colima socket path) left `local` down. It
+  now always sets `DATABASE_URL`, `DOCKER_HOST`, `SERVER_PORT` and `GIN_MODE`
+  for the container.
 - Web UI pages such as `/login` were served with HTTP status 404 (gin presets
   it for unmatched routes) although the page itself loaded; they now return
   200. Unknown `/api/` paths still answer a JSON 404.
