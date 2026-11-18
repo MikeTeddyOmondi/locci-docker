@@ -114,6 +114,10 @@ curl -fsS -X POST "$LOCCI_URL/api/v1/sso/providers" \
 
 ## Notes
 
+- **Device flow:** Authentik needs a device code flow set on the brand
+  (System, Brands, the brand, "Device code flow", for example
+  `default-provider-authorization-implicit-consent`). Users then enter the
+  code at `https://<authentik>/device`.
 - **Allowed grant types:** a provider created through the API in recent
   versions starts with none, and the sign-in fails with "The request is
   otherwise malformed" (Authentik logs "Invalid grant_type for provider").

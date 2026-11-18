@@ -79,6 +79,9 @@ curl -fsS -X POST "$LOCCI_URL/api/v1/sso/providers" \
 
 ## Notes
 
+- **Device flow:** `locci login --device` works when Pocket ID's discovery
+  document lists a `device_authorization_endpoint`; otherwise use the
+  browser sign-in.
 - **Emails aren't marked verified** unless Pocket ID's email verification is
   on. So new locci users get the Pocket ID username (`bob`) rather than the
   email, existing accounts aren't linked by email, and an allowed-domains list

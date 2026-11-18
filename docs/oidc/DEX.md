@@ -97,6 +97,9 @@ Sign in as `admin@example.com` / `password`.
 
 ## Notes
 
+- **Device flow:** Dex supports it; add Dex's own `https://dex.example.com/dex/device/callback`
+  to the client's `redirectURIs`. Users enter the code at
+  `https://dex.example.com/dex/device`.
 - Dex's static password users have no groups, so the admin-group mapping only
   applies with connectors that return groups (GitHub teams, LDAP, SAML); add
   `groups` to the scopes then.

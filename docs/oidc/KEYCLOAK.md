@@ -21,6 +21,8 @@ a group, including demotion when the user leaves the group.
    - Client authentication **on** (confidential), Standard flow **on**.
    - Valid redirect URIs: the redirect URI above.
    - Advanced, "Proof Key for Code Exchange Code Challenge Method": `S256`.
+   - Capability config: **OAuth 2.0 Device Authorization Grant on**, if people
+     will use `locci login --device`.
    - Credentials tab: copy the client secret.
 3. **Groups claim:** the client, Client scopes, `locci-dedicated`, Add mapper,
    By configuration, **Group Membership**:
@@ -58,7 +60,8 @@ $K create realms -s realm=locci -s enabled=true
 CID=$($K create clients -r locci -i -s clientId=locci -s enabled=true \
   -s publicClient=false -s secret=change-this-client-secret -s standardFlowEnabled=true \
   -s "redirectUris=[\"$REDIRECT\"]" \
-  -s "attributes.\"pkce.code.challenge.method\"=S256")
+  -s "attributes.\"pkce.code.challenge.method\"=S256" \
+  -s "attributes.\"oauth2.device.authorization.grant.enabled\"=true")
 $K create clients/$CID/protocol-mappers/models -r locci \
   -s name=groups -s protocol=openid-connect -s protocolMapper=oidc-group-membership-mapper \
   -s "config.\"claim.name\"=groups" -s "config.\"full.path\"=false" \
@@ -87,6 +90,11 @@ curl -fsS -X POST "$LOCCI_URL/api/v1/sso/providers" \
 
 ## Notes
 
+- **Device flow:** with the device grant enabled,
+  `locci login --sso keycloak --device` prints a code; the user enters it at
+  `https://<keycloak>/realms/<realm>/device`, signs in and approves. With PKCE
+  enforced on the client, Keycloak also requires PKCE on device requests,
+  which locci sends.
 - Keycloak's issuer is derived from the hostname it is reached at. Use the
   same host for locci's issuer URL as browsers use, or set Keycloak's
   `KC_HOSTNAME`.

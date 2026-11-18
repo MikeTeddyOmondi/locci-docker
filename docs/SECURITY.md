@@ -27,6 +27,10 @@ manage users, environments and read the audit log.
 - The resulting token reaches the browser in the URL fragment, which is never
   sent to servers or written to logs, and the page removes it at once. The CLI
   receives it on a listener bound to `127.0.0.1`.
+- The device flow is driven by the server, which holds the client secret. The
+  CLI only sees the user code and a handle sealed with `LOCCI_SECRET_KEY`
+  (containing the device code and a PKCE verifier), so the device code can't
+  be read, altered or used with another provider.
 - Accounts are linked by email only when the provider says the email is
   verified. Only enable providers you trust to verify emails, and use the
   allowed-domains list to keep strangers out of providers that admit anyone

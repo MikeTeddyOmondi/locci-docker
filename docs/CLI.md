@@ -21,13 +21,16 @@ Global flags:
 locci login --url https://locci.example.com -u mike     # prompts for the password
 locci login --url http://localhost:8998 --token $AUTH_TOKEN
 locci login --url https://locci.example.com --sso keycloak # single sign-on in your browser
+locci login --url https://locci.example.com --sso keycloak --device  # no browser here: shows a code
 locci whoami
 locci logout                                             # revokes the token
 ```
 
 `--sso` opens the browser at the server's sign-in page for that provider and
 listens on `127.0.0.1` for the result (the URL is printed too, for machines
-where no browser opens). The provider names are the slugs shown on the
+where no browser opens). Add `--device` on machines without a browser: it
+prints a URL and a code to enter on any other device, then waits for the
+approval. The provider names are the slugs shown on the
 Sign-in page; see [OIDC.md](OIDC.md).
 
 The URL and token are saved in the CLI config file (see

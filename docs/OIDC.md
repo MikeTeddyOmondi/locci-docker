@@ -8,12 +8,12 @@ token, so the API, CLI and audit log work exactly as with passwords.
 Step-by-step guides, each with a manual and a scripted setup, tested against
 the real provider:
 
-| Provider | Guide |
-|---|---|
-| Keycloak | [oidc/KEYCLOAK.md](oidc/KEYCLOAK.md) |
-| Authentik | [oidc/AUTHENTIK.md](oidc/AUTHENTIK.md) |
-| Pocket ID | [oidc/POCKETID.md](oidc/POCKETID.md) |
-| Dex | [oidc/DEX.md](oidc/DEX.md) |
+| Provider | Guide | Device flow (`--device`) |
+|---|---|---|
+| Keycloak | [oidc/KEYCLOAK.md](oidc/KEYCLOAK.md) | yes, enable it on the client (tested) |
+| Authentik | [oidc/AUTHENTIK.md](oidc/AUTHENTIK.md) | yes, set a device code flow on the brand |
+| Pocket ID | [oidc/POCKETID.md](oidc/POCKETID.md) | check your version's discovery document |
+| Dex | [oidc/DEX.md](oidc/DEX.md) | yes, register its `/device/callback` redirect |
 
 Others with discovery (Zitadel, Authelia, Kanidm, Ory, Google, Microsoft Entra
 ID, GitLab, Okta, Auth0) use the same settings: an issuer URL, a client ID and
@@ -110,6 +110,13 @@ it.
   and is removed from the address bar at once.
 - **CLI:** `locci login --url https://locci.example.com --sso keycloak` opens
   the browser and listens on `127.0.0.1` for the result.
+- **CLI without a browser** (servers, SSH sessions):
+  `locci login --url https://locci.example.com --sso keycloak --device` prints
+  a URL and a code to enter on any other device (a phone works), then waits.
+  This is the OAuth device flow (RFC 8628); the provider must offer it (its
+  discovery has a `device_authorization_endpoint`) and it often has to be
+  enabled on the client. The locci server talks to the provider on the CLI's
+  behalf, so the client secret never leaves the server.
 
 Every sign-in and failed attempt is in the audit log as `LOGIN`.
 
@@ -122,3 +129,4 @@ Every sign-in and failed attempt is in the audit log as `LOGIN`.
 | `no locci account is linked` | "Create accounts on first sign-in" is off and no user is named after the verified email. |
 | `oidc: issuer URL provided to client ... did not match the issuer URL returned by provider` | the issuer URL differs from the provider's own (often a trailing slash or `localhost` versus `127.0.0.1`). Use exactly what the provider's discovery document says. |
 | provider says `redirect_uri` is invalid | register the exact redirect URI shown on the Sign-in page. |
+| `doesn't offer the device flow` | the provider has no device endpoint, or the device grant isn't enabled for the client. See the provider guide. |

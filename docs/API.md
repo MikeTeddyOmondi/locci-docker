@@ -34,6 +34,8 @@ See [OIDC.md](OIDC.md). Public routes:
 | `GET /auth/providers` | `{"password_login": true, "providers": [{"slug","display_name"}]}`; the list is empty until a provider is enabled |
 | `GET /auth/oidc/:provider/start[?cli_port=N]` | redirects to the provider; `404` unless the provider is enabled |
 | `GET /auth/oidc/:provider/callback` | finishes sign-in; redirects to `/login#token=...` (or `#error=...`), or for the CLI to `http://127.0.0.1:N/callback?token=...` |
+| `POST /auth/oidc/:provider/device` | device flow: `{"user_code", "verification_uri", "verification_uri_complete", "expires_in", "interval", "handle"}`; `400` if the provider has no device endpoint |
+| `POST /auth/oidc/:provider/device/token` | `{"handle": "..."}`; `{"status": "pending"}` or `"slow_down"` while waiting (poll at `interval` seconds, add 5 on `slow_down`), `{"status": "ok", "token", "user"}` once approved, `400` on denial or expiry |
 
 Admin routes:
 
