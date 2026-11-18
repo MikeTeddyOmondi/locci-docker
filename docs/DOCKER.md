@@ -4,8 +4,8 @@ The [`Dockerfile`](../Dockerfile) builds everything in three stages:
 
 1. **web**: `oven/bun` installs the UI's packages from `bun.lock`
    (`--frozen-lockfile`) and builds the SvelteKit app.
-2. **build**: Go with cgo (go-libsql needs it) compiles the single binary with
-   the UI embedded.
+2. **build**: Go compiles the single static binary with the UI embedded,
+   cross-compiling for each target platform (no emulation for multi-arch).
 3. **runtime**: Debian slim with the binary, `ca-certificates` and nothing
    else. The database lives on the `/data` volume
    (`DATABASE_URL=file:/data/locci.db`), the server listens on `8998`.

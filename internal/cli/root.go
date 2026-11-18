@@ -9,6 +9,9 @@ import (
 	"github.com/MikeTeddyOmondi/locci-docker/internal/docker"
 )
 
+// Version is set at build time (-ldflags "-X .../internal/cli.Version=v1.2.3").
+var Version = "dev"
+
 // Execute runs the root command.
 func Execute() {
 	if err := newRoot().Execute(); err != nil {
@@ -20,6 +23,7 @@ func Execute() {
 func newRoot() *cobra.Command {
 	root := &cobra.Command{
 		Use:          "locci",
+		Version:      Version,
 		Short:        "Locci container manager: API server, web UI and CLI in one binary",
 		SilenceUsage: true,
 	}

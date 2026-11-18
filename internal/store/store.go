@@ -1,5 +1,5 @@
 // Package store keeps users, API tokens, Docker environments, OIDC providers
-// and the audit log in libsql.
+// and the audit log in SQLite (a local file) or a remote libsql server.
 //
 // DATABASE_URL can be a local file ("file:locci.db") or a remote
 // libsql/Turso URL ("libsql://<db>.turso.io?authToken=...").
@@ -16,8 +16,9 @@ import (
 	"sync"
 	"time"
 
-	_ "github.com/tursodatabase/go-libsql"
+	_ "github.com/tursodatabase/libsql-client-go/libsql"
 	"golang.org/x/crypto/bcrypt"
+	_ "modernc.org/sqlite"
 )
 
 var ErrNotFound = errors.New("not found")
@@ -144,9 +145,20 @@ var addedColumns = []struct{ add, then string }{
 
 // Open connects and creates the tables if needed.
 func Open(url string) (*Store, error) {
-	db, err := sql.Open("libsql", url)
+	// A file is SQLite in pure Go (modernc.org/sqlite); anything else is a
+	// remote libsql server or Turso (libsql://, https://, wss://).
+	driver, dsn := "libsql", url
+	if strings.HasPrefix(url, "file:") {
+		driver, dsn = "sqlite", url
+		sep := "?"
+		if strings.Contains(url, "?") {
+			sep = "&"
+		}
+		dsn += sep + "_pragma=busy_timeout(5000)"
+	}
+	db, err := sql.Open(driver, dsn)
 	if err != nil {
-		return nil, fmt.Errorf("open %s: %w", url, err)
+		return nil, fmt.Errorf("open database: %w", err)
 	}
 	// A local SQLite file allows one writer; concurrent writers from the pool
 	// (audit log, health checks) fail with "database is locked". One
@@ -236,7 +248,7 @@ func (s *Store) ListUsers() ([]User, error) {
 	users := []User{}
 	for rows.Next() {
 		var u User
-		if err := rows.Scan(&u.ID, &u.Username, &u.Role, &u.Created, &u.HasPassword); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.Role, stamp{&u.Created}, &u.HasPassword); err != nil {
 			return nil, err
 		}
 		users = append(users, u)
@@ -304,7 +316,7 @@ func (s *Store) CheckPassword(username, password string) (User, error) {
 
 func (s *Store) scanUser(row *sql.Row) (User, error) {
 	var u User
-	err := row.Scan(&u.ID, &u.Username, &u.Role, &u.Created, &u.HasPassword)
+	err := row.Scan(&u.ID, &u.Username, &u.Role, stamp{&u.Created}, &u.HasPassword)
 	if errors.Is(err, sql.ErrNoRows) {
 		return User{}, ErrNotFound
 	}
@@ -337,7 +349,7 @@ func (s *Store) ListAudit(limit int) ([]AuditEntry, error) {
 	out := []AuditEntry{}
 	for rows.Next() {
 		var a AuditEntry
-		if err := rows.Scan(&a.ID, &a.At, &a.Username, &a.Method, &a.Path, &a.Status); err != nil {
+		if err := rows.Scan(&a.ID, stamp{&a.At}, &a.Username, &a.Method, &a.Path, &a.Status); err != nil {
 			return nil, err
 		}
 		out = append(out, a)

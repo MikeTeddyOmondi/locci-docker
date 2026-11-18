@@ -2,7 +2,7 @@
 
 ## Tools
 
-- Go 1.24+ and a C compiler (go-libsql needs cgo: `CGO_ENABLED=1`)
+- Go 1.27+ (pure Go: no C compiler, `CGO_ENABLED=0`)
 - [Bun](https://bun.sh) for the web UI (the lockfile is `web/bun.lock`)
 - [just](https://just.systems) for the recipes below
 - Docker, to have something to manage
@@ -35,7 +35,7 @@ internal/env         one Docker connection per environment, health loop
 internal/jobs        RabbitMQ deploy consumer
 internal/secret      AES-GCM for stored keys (LOCCI_SECRET_KEY)
 internal/server      Gin router, handlers, auth, audit, exec WebSocket
-internal/store       libsql: users, tokens, environments, audit log
+internal/store       SQLite (modernc.org/sqlite) or remote libsql: users, tokens, environments, audit log
 internal/ui          embeds internal/ui/dist
 web/                 SvelteKit app (Svelte 5, shadcn-svelte, Tailwind v4)
 docs/                these guides
@@ -67,7 +67,7 @@ Rules that keep it simple:
 just test         # go vet + go test ./...
 ```
 
-- Server tests use a temporary libsql file and `httptest`; a Docker host at
+- Server tests use a temporary SQLite file and `httptest`; a Docker host at
   `tcp://127.0.0.1:1` stands in for "Docker is down", and a small fake Docker
   API (answering `/_ping` and a few endpoints) for a working one.
 - `internal/docker` tests run a real TLS server with generated certificates

@@ -40,8 +40,6 @@ doctor:
     @go version
     # Bun, for installing and building the web UI
     @bun --version
-    # C compiler, needed by go-libsql (cgo)
-    @gcc --version | head -1
     # Docker daemon the server will manage
     @docker info >/dev/null 2>&1 && echo "docker: reachable" || echo "docker: not reachable"
 
@@ -89,11 +87,11 @@ web:
     # the build wipes dist; restore the tracked placeholder
     touch internal/ui/dist/.gitkeep
 
-# build the binary (cgo is required by go-libsql)
+# build the binary (pure Go, static)
 [group('build')]
 build:
-    # compile ./cmd/locci into ./locci with cgo enabled
-    CGO_ENABLED=1 go build -o {{ bin }} ./cmd/locci
+    # compile ./cmd/locci into ./locci; the version comes from git
+    CGO_ENABLED=0 go build -ldflags "-X github.com/MikeTeddyOmondi/locci-docker/internal/cli.Version=$(git describe --tags --always --dirty 2>/dev/null || echo dev)" -o {{ bin }} ./cmd/locci
 
 # build the web UI, then the binary
 [group('build')]
@@ -149,7 +147,7 @@ logs container:
 [group('cli')]
 install:
     # build and copy the binary into Go's bin directory
-    CGO_ENABLED=1 go install ./cmd/locci
+    CGO_ENABLED=0 go install ./cmd/locci
 
 # ---------------------------------------------------------------- docker
 

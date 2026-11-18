@@ -335,9 +335,16 @@ that is an API server, a web UI and a CLI.
   console, and their environment is hidden when inspected. The image carries
   the label, so the server and agents are protected. Admins are not limited;
   `LOCCI_USER_HOST_ACCESS=true` restores the old behaviour for everyone.
-- Dependencies with security fixes that still build with Go 1.24:
-  `go-jose/v4` 4.1.4, OpenTelemetry 1.41.0, `docker/docker` 28.3.3. The
-  remaining govulncheck findings need a newer Go (see `BACKLOG.md`).
+- Go 1.27.4 and every dependency on its latest release (gin 1.12,
+  go-oidc 3.21, x/crypto 0.59, x/net 0.63, docker client 28.5.2, ...).
+  govulncheck finds nothing reachable outside the Docker client module,
+  whose remaining advisories are daemon-side with no client fix.
+- SQLite is now pure Go (`modernc.org/sqlite`) for `file:` databases, and
+  remote libsql/Turso URLs use `libsql-client-go`. go-libsql's prebuilt
+  libraries contain LTO bitcode, which patched Go releases refuse to link.
+  The binary is static (`CGO_ENABLED=0`), existing database files open
+  unchanged, and the Dockerfile cross-compiles per platform instead of
+  emulating. `locci --version` reports the build's version.
 - A container's subdomain must be one DNS label (lowercase letters, digits,
   dashes): it is part of Traefik's label keys, where a dot or backtick could
   change other routes.

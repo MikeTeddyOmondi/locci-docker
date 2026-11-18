@@ -47,7 +47,7 @@ const providerColumns = `id, slug, display_name, issuer_url, client_id, client_s
 func scanProvider(row interface{ Scan(...any) error }) (Provider, error) {
 	var p Provider
 	err := row.Scan(&p.ID, &p.Slug, &p.DisplayName, &p.IssuerURL, &p.ClientID, &p.ClientSecret, &p.Scopes,
-		&p.Enabled, &p.AutoCreateUsers, &p.DefaultRole, &p.AdminGroup, &p.GroupsClaim, &p.AllowedDomains, &p.CreatedAt)
+		&p.Enabled, &p.AutoCreateUsers, &p.DefaultRole, &p.AdminGroup, &p.GroupsClaim, &p.AllowedDomains, stamp{&p.CreatedAt})
 	if errors.Is(err, sql.ErrNoRows) {
 		return Provider{}, ErrNotFound
 	}

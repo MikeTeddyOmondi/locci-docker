@@ -27,17 +27,6 @@ var tokenID = regexp.MustCompile(`^[0-9a-f]{16}$`)
 // sqlTime formats t like SQLite's CURRENT_TIMESTAMP, so the two compare as text.
 func sqlTime(t time.Time) string { return t.UTC().Format("2006-01-02 15:04:05") }
 
-// parseTime reads a timestamp as the driver returns it (RFC 3339) or as
-// SQLite stores it.
-func parseTime(v string) (time.Time, bool) {
-	for _, layout := range []string{time.RFC3339, "2006-01-02 15:04:05"} {
-		if t, err := time.Parse(layout, v); err == nil {
-			return t, true
-		}
-	}
-	return time.Time{}, false
-}
-
 // cutoff is the oldest last use a live token can have ("" = no expiry).
 func (s *Store) cutoff() string {
 	if s.TokenTTL <= 0 {
@@ -101,7 +90,7 @@ func (s *Store) Tokens(userID int64, current string) ([]Token, error) {
 	for rows.Next() {
 		var h string
 		var t Token
-		if err := rows.Scan(&h, &t.Name, &t.Created, &t.LastUsed); err != nil {
+		if err := rows.Scan(&h, &t.Name, stamp{&t.Created}, stamp{&t.LastUsed}); err != nil {
 			return nil, err
 		}
 		t.ID, t.Current = h[:16], h == cur

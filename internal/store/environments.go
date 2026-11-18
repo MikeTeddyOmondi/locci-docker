@@ -62,7 +62,7 @@ func scanEnvironment(row interface{ Scan(...any) error }) (Environment, error) {
 	var e Environment
 	var labels string
 	err := row.Scan(&e.ID, &e.Name, &e.Label, &e.Kind, &e.URL, &e.TLSCA, &e.TLSCert, &e.Secret,
-		&e.SSHHostKey, &labels, &e.IsDefault, &e.Status, &e.LastSeenAt, &e.CreatedAt)
+		&e.SSHHostKey, &labels, &e.IsDefault, &e.Status, stamp{&e.LastSeenAt}, stamp{&e.CreatedAt})
 	if errors.Is(err, sql.ErrNoRows) {
 		return Environment{}, ErrNotFound
 	}

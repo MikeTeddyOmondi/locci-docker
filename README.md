@@ -11,13 +11,13 @@ Manage the local Docker host and any number of remote ones over TLS or SSH.
   host keys and keys encrypted at rest
 - **Single sign-on**: any OpenID Connect provider (Keycloak, Authentik, Pocket ID,
   Dex, ...), off until an admin enables one; passwords stay the default
-- **Storage**: libsql (local file or Turso) for users, tokens, environments and the audit log
+- **Storage**: SQLite in pure Go (a local file) or remote libsql/Turso for users, tokens, environments and the audit log
 - **Deploy jobs**: optional RabbitMQ consumer
 
 ## Quick start
 
 ```sh
-just setup                            # .env, Go modules, web packages (needs Go 1.24+, Bun, a C compiler)
+just setup                            # .env, Go modules, web packages (needs Go 1.27+ and Bun)
 just all                              # build the UI, then the binary
 ./locci user add admin --admin        # prompts for a password
 ./locci serve                         # http://localhost:8998
@@ -88,6 +88,7 @@ environment: `POST/GET /api/v1/networks`, `POST/GET /api/v1/containers`,
 
 ## Notes
 
-- go-libsql uses cgo: build with `CGO_ENABLED=1` on glibc (the Dockerfile handles this).
+- The binary is pure Go and static (`CGO_ENABLED=0`), so it cross-compiles
+  anywhere. Signed release binaries and images: [docs/RELEASING.md](docs/RELEASING.md).
 - Access to a Docker socket is root on that host. Serve locci over HTTPS and
   read [docs/SECURITY.md](docs/SECURITY.md).
