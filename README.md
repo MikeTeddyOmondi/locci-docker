@@ -32,6 +32,7 @@ repository's [`compose.yaml`](compose.yaml) (see [docs/DOCKER.md](docs/DOCKER.md
 services:
   locci:
     image: locci/docker:latest
+    container_name: locci-docker
     restart: unless-stopped
     ports: ["8998:8998"]
     env_file: .env
@@ -41,12 +42,13 @@ services:
       DOCKER_HOST: unix:///var/run/docker.sock  # the socket mounted below
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - locci-data:/data
+      - locci-docker-data:/data
 volumes:
-  locci-data:
+  locci-docker-data:
+    name: locci-docker-data
 ```
 
-Then `docker exec -it <container> locci user add admin --admin` and open
+Then `docker exec -it locci-docker locci user add admin --admin` and open
 http://localhost:8998.
 
 From another terminal or machine:

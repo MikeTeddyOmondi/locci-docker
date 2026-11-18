@@ -13,9 +13,10 @@ that is an API server, a web UI and a CLI.
 ### Added
 
 - **Compose profiles for Keycloak and Pocket ID.** `just compose-up keycloak`
-  (or `pocket-id`) starts a provider next to locci for trying single sign-on.
-  They share a network held by a small `net` service, so `localhost` issuer
-  URLs work for the browser and for locci alike (`docs/DOCKER.md`).
+  (or `pocket-id`) starts a provider next to locci in production mode
+  (Keycloak with PostgreSQL); missing secrets stop it with a message. They
+  share a network held by a small `net` service, so `localhost` issuer URLs
+  work for the browser and for locci alike (`docs/DOCKER.md`).
 - **Dual license.** locci is available under the MIT license
   (`MIT-LICENSE.md`) or the Apache License 2.0 (`APACHE-LICENSE.md`), at your
   option.
@@ -62,7 +63,7 @@ that is an API server, a web UI and a CLI.
   layout and the API route list.
 - **compose.yaml** and `just compose-up` / `compose-down` / `compose-logs`:
   builds the image from source and runs it with the Docker socket, the
-  `locci-data` volume and an optional `.env`.
+  `locci-docker-data` volume and an optional `.env`.
 - **Justfile** grouped into setup, develop, build, cli, docker and project
   recipes, with a comment on every command: `just cli <args>` runs any CLI
   command from source, and project recipes cover `status`, `branch`, `commit`
@@ -293,6 +294,10 @@ that is an API server, a web UI and a CLI.
 
 ### Changed
 
+- **Compose names.** Containers are `locci-docker`, `locci-docker-net` and
+  `locci-docker-<provider>`; the database volume is `locci-docker-data` (was
+  `locci-data`, also for `just up`). `docs/DOCKER.md` shows how to copy the
+  old volume over.
 - Go 1.27.4 and every dependency on its latest release (gin 1.12,
   go-oidc 3.21, x/crypto 0.59, x/net 0.63, docker client 28.5.2, ...).
   govulncheck finds nothing reachable outside the Docker client module,

@@ -163,7 +163,7 @@ up tag="latest":
     # socket = manage host containers, volume = keep the database
     docker run -d --name {{ bin }} -p 8998:8998 --stop-timeout 30 \
       -v /var/run/docker.sock:/var/run/docker.sock \
-      -v locci-data:/data \
+      -v locci-docker-data:/data \
       --env-file .env \
       -e DATABASE_URL=file:/data/locci.db \
       -e DOCKER_HOST=unix:///var/run/docker.sock \

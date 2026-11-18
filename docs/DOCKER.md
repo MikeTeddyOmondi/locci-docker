@@ -25,13 +25,13 @@ open http://localhost:8998
 ```sh
 docker run -d --name locci -p 8998:8998 \
   -v /var/run/docker.sock:/var/run/docker.sock \
-  -v locci-data:/data \
+  -v locci-docker-data:/data \
   --env-file .env \
   locci/docker:latest
 ```
 
 `just docker-logs` follows the logs and `just down` removes the container
-(the `locci-data` volume, and with it the database, is kept).
+(the `locci-docker-data` volume, and with it the database, is kept).
 
 `just up` takes settings such as `LOCCI_SECRET_KEY` from `.env`, but always sets
 `DATABASE_URL`, `DOCKER_HOST`, `SERVER_PORT` and `GIN_MODE` for the container.
@@ -40,108 +40,141 @@ relative database file or a Colima socket path.
 
 ## Compose
 
-[`compose.yaml`](../compose.yaml) runs the same container:
+[`compose.yaml`](../compose.yaml) runs the same server, plus optional
+identity providers for single sign-on in production mode:
 
 ```sh
-just compose-up        # docker compose up -d --build, then http://localhost:8998
-just compose-logs
-just compose-down      # the locci-data volume is kept
-```
-
-- It builds the image from the current source each time (cached layers keep
-  this quick), so the container never runs stale code.
-- `.env` is optional and works the same way as with `just up`.
-- `LOCCI_PORT=9000 just compose-up` publishes on another port.
-- It uses the same `locci-data` volume as `just up`, so both see one database.
-  Run one of them at a time, since both want port 8998.
-- `LOCCI_TAG=v1.2.3 just compose-up` names a different image tag.
-- The server shares its network with a tiny `net` service
-  (`registry.k8s.io/pause`, under 1 MB) that holds the published ports. That
-  is what lets the identity providers below sit on `localhost` for both your
-  browser and locci; rebuilding locci doesn't disturb them.
-
-## Identity providers for trying SSO
-
-`compose.yaml` can also start Keycloak or Pocket ID next to locci, so you can
-try single sign-on without setting up a provider elsewhere. They're compose
-profiles: off unless you name them.
-
-```sh
-just compose-up keycloak             # locci and Keycloak
+just compose-up                      # locci only, then http://localhost:8998
+just compose-up keycloak             # locci and Keycloak (with its PostgreSQL)
 just compose-up pocket-id            # locci and Pocket ID
-just compose-up keycloak pocket-id   # both
-just compose-down                    # stops all of them; their data volumes are kept
+just compose-up keycloak pocket-id   # all of them
+just compose-logs
+just compose-down                    # stops everything; the volumes are kept
 ```
 
 Without just: `docker compose --profile keycloak up -d`.
 
-| Provider | Opens at | Issuer URL for locci | First sign-in |
-|---|---|---|---|
-| Keycloak 26 | http://localhost:8180 | `http://localhost:8180/realms/<realm>` | `admin` / `change-me` |
-| Pocket ID 1.16 | http://localhost:1411 | `http://localhost:1411` | http://localhost:1411/setup creates the admin and a passkey |
+| Container | What | Volume |
+|---|---|---|
+| `locci-docker` | the server and web UI | `locci-docker-data` (the database) |
+| `locci-docker-net` | holds the network and the published ports (see below) | |
+| `locci-docker-keycloak` | Keycloak 26, profile `keycloak` | |
+| `locci-docker-keycloak-db` | PostgreSQL 17 for Keycloak, profile `keycloak` | `locci-docker-keycloak-db` |
+| `locci-docker-pocket-id` | Pocket ID 1.16, profile `pocket-id` | `locci-docker-pocket-id-data` |
 
-Every container in the set shares one network, so `localhost:8180` is
-Keycloak both in your browser and inside locci's container. The issuer URL
-must be the same for both: locci fetches the provider's keys and tokens
-from it, and the provider puts it in every token. Use `localhost` (not
-`127.0.0.1` or a LAN address) in the issuer and in your browser.
+- It builds the image from the current source each time (cached layers keep
+  this quick), so the container never runs stale code.
+  `LOCCI_TAG=v1.2.3 just compose-up` names a different image tag.
+- `.env` is optional for locci alone and works the same way as with
+  `just up`. The identity providers need secrets from it (below).
+- It uses the same `locci-docker-data` volume as `just up`, so both see one
+  database. Run one of them at a time, since both want port 8998 (and the
+  container names are fixed, so one compose project per machine).
+- locci, Keycloak and Pocket ID share one network namespace, held by
+  `locci-docker-net` (a `registry.k8s.io/pause` container, under 1 MB, as in
+  a Kubernetes pod). The published ports belong to it, so `localhost:8180`
+  is Keycloak both for your browser and inside locci's container, and
+  rebuilding locci doesn't disturb the providers.
+
+### Upgrading from the `locci-data` volume
+
+Earlier versions kept the database in a volume named `locci-data`. Copy it
+into the new one once, with the server stopped:
+
+```sh
+just compose-down    # or: just down
+docker run --rm -v locci-data:/from -v locci-docker-data:/to alpine cp -a /from/. /to/
+just compose-up
+```
+
+Remove `locci-data` (`docker volume rm locci-data`) once the new one works.
+
+## Single sign-on with the bundled providers
+
+Keycloak and Pocket ID run in production mode: Keycloak with `start` (not
+`start-dev`) on PostgreSQL, Pocket ID with its normal server. Both expect
+TLS at a reverse proxy in front of them, like locci does
+([REVERSE_PROXY.md](REVERSE_PROXY.md)).
+
+### Settings (`.env`)
+
+| Variable | Needed for | Default | What |
+|---|---|---|---|
+| `LOCCI_SECRET_KEY` | either | | locci stores the client secret with it (`openssl rand -base64 32`) |
+| `KEYCLOAK_ADMIN_PASSWORD` | keycloak | (required) | the first Keycloak admin's password; read on the first start |
+| `KEYCLOAK_ADMIN` | keycloak | `admin` | that admin's username |
+| `KEYCLOAK_DB_PASSWORD` | keycloak | (required) | PostgreSQL password; fixed when the database is first created |
+| `KEYCLOAK_URL` | keycloak | `http://localhost:8180` | the address people and locci reach Keycloak at, such as `https://auth.example.com` |
+| `KEYCLOAK_PORT` | keycloak | `8180` | Keycloak's port, inside and outside |
+| `POCKET_ID_ENCRYPTION_KEY` | pocket-id | (required) | encrypts Pocket ID's signing keys (`openssl rand -base64 32`); keep it with your backups |
+| `POCKET_ID_URL` | pocket-id | `http://localhost:1411` | the address people and locci reach Pocket ID at, such as `https://id.example.com` |
+| `POCKET_ID_PORT` | pocket-id | `1411` | Pocket ID's port, inside and outside |
+
+A provider whose required settings are missing doesn't start, and its log
+says which ones (`docker logs locci-docker-keycloak`). Compose can't require
+a variable for one profile only, so the check runs when the container
+starts.
+
+The ports are published even when the profiles are off (they belong to
+`locci-docker-net`). If 8180 or 1411 is taken on your machine, change the
+port variable.
+
+### Where they run
+
+**On a server, behind a reverse proxy (the usual case).** Point a hostname
+at each provider through your proxy with HTTPS, and set `KEYCLOAK_URL` /
+`POCKET_ID_URL` (and `LOCCI_PUBLIC_URL` for locci) to those `https://`
+addresses. locci reaches the providers at the same public addresses as
+browsers do, so the server must be able to resolve and reach them. Bind the
+published ports to `127.0.0.1` (or firewall them) so only the proxy reaches
+them.
+
+**On one machine, to try it.** The defaults work as they are, on plain HTTP
+at `localhost`: the shared network makes `localhost` the same place for the
+browser and for locci, and browsers treat `localhost` as secure, so Pocket
+ID's passkeys work there. Use `localhost`, not `127.0.0.1` or a LAN address,
+in the browser and in issuer URLs.
 
 ### Set it up
 
-1. Set `LOCCI_SECRET_KEY` in `.env` (`openssl rand -base64 32`); locci needs
-   it to store the client secret. Start with `just compose-up keycloak` (or
-   `pocket-id`) and create a locci admin:
-   `docker compose exec locci locci user add admin --admin`.
+1. Set the variables above in `.env` and start, for example
+   `just compose-up keycloak`. Create a locci admin:
+   `docker exec -it locci-docker locci user add admin --admin`.
 2. In the provider, create a client for locci with this redirect URI
    (`<slug>` is the name you give the provider in locci in step 3, such as
-   `keycloak` or `pocketid`):
+   `keycloak` or `pocketid`; use `LOCCI_PUBLIC_URL` in place of
+   `http://localhost:8998` behind a proxy):
 
    ```
    http://localhost:8998/api/v1/auth/oidc/<slug>/callback
    ```
 
-   - **Keycloak:** sign in to the admin console, create a realm (such as
-     `locci`), then a confidential OpenID Connect client with that redirect
-     URI, a `locci-admins` group and a user. Step by step, and a scripted
-     version: [oidc/KEYCLOAK.md](oidc/KEYCLOAK.md).
-   - **Pocket ID:** after `/setup`, Administration, OIDC Clients, Add, with
-     that callback URL; a `locci-admins` group under User Groups. See
+   - **Keycloak:** sign in to the admin console at `KEYCLOAK_URL` with
+     `KEYCLOAK_ADMIN`, create a realm (such as `locci`), a confidential
+     OpenID Connect client with that redirect URI, a `locci-admins` group
+     and users. Then make a permanent admin account: the bootstrap admin is
+     meant to be temporary. Details: [oidc/KEYCLOAK.md](oidc/KEYCLOAK.md).
+   - **Pocket ID:** open `<POCKET_ID_URL>/setup` to create the admin and its
+     passkey, then Administration, OIDC Clients, Add, with that callback
+     URL, and a `locci-admins` group under User Groups. Details:
      [oidc/POCKETID.md](oidc/POCKETID.md).
-3. In locci, Harbour master, **Sign-in**, **Add provider**: the issuer URL from
-   the table, the client ID and secret, and `locci-admins` as the admin
-   group. Or use the API call in the provider's guide, with the issuer above.
-4. Sign out. The login page now shows "Continue with ...". From the
-   CLI: `locci login --url http://localhost:8998 --sso <slug>`.
+3. In locci, Harbour master, **Sign-in**, **Add provider**: the issuer URL
+   (Keycloak: `<KEYCLOAK_URL>/realms/<realm>`; Pocket ID: `POCKET_ID_URL`),
+   the client ID and secret, and `locci-admins` as the admin group.
+4. Sign out. The login page now shows "Continue with ...". From the CLI:
+   `locci login --url http://localhost:8998 --sso <slug>`.
 
-### Settings
+### Back up
 
-Set these in `.env` to change the defaults:
+- `locci-docker-data` and `LOCCI_SECRET_KEY` (see below).
+- `locci-docker-keycloak-db` (or `pg_dump` in `locci-docker-keycloak-db`).
+- `locci-docker-pocket-id-data` and `POCKET_ID_ENCRYPTION_KEY`.
 
-| Variable | Default | What |
-|---|---|---|
-| `KEYCLOAK_PORT` | `8180` | Keycloak's port, inside and outside (the issuer URL follows it) |
-| `KEYCLOAK_ADMIN`, `KEYCLOAK_ADMIN_PASSWORD` | `admin`, `change-me` | the first Keycloak admin; only read on Keycloak's first start |
-| `POCKET_ID_PORT` | `1411` | Pocket ID's port, inside and outside |
-| `POCKET_ID_ENCRYPTION_KEY` | a fixed trial value | encrypts Pocket ID's signing keys; set your own (`openssl rand -base64 32`) before keeping any data |
-
-The ports are published even when the profiles are off (they belong to the
-`net` service). If 8180 or 1411 is taken on your machine, change the
-variable.
-
-### Limits
-
-These setups are for trying SSO on one machine. Keycloak runs in
-development mode with its built-in database, and both use plain HTTP on
-`localhost` (Pocket ID's passkeys work there because browsers treat
-`localhost` as secure). For a provider other people sign in to, run it
-properly behind HTTPS and give locci its public issuer URL; see
-[OIDC.md](OIDC.md).
-
-Tested: both providers start, locci in its container discovers each issuer
-at `localhost` and redirects to it for sign-in, and that still holds after
-locci is rebuilt. A full browser sign-in through these compose-run
-providers wasn't repeated here; the provider guides cover that against the
-same versions.
+Tested on one machine with the defaults: Keycloak starts in its `prod`
+profile on PostgreSQL, a user signed in through it end to end and got a
+locci session, Pocket ID starts and locci discovers it and redirects to it,
+and providers with missing secrets refuse to start with a message. Not
+tested: the same behind a real reverse proxy with public hostnames.
 
 ## The agent image
 
