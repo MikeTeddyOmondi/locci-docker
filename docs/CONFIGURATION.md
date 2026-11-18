@@ -13,8 +13,8 @@ win over it. Copy [`.env.sample`](../.env.sample) to start.
 | `DATABASE_URL` | `file:locci.db` | libsql database: a local file, or `libsql://<db>.turso.io?authToken=...` for Turso |
 | `AUTH_TOKEN` | empty | Optional static admin token for machine-to-machine calls. Leave empty to require user logins only |
 | `LOCCI_SECRET_KEY` | empty | 32 random bytes, base64. Encrypts the TLS and SSH keys of remote environments and OIDC client secrets, and seals the sign-in cookie. Generate with `openssl rand -base64 32` |
-| `LOCCI_PUBLIC_URL` | empty | The address people open locci at, such as `https://locci.example.com`. Used for OIDC redirect URIs; without it they come from each request (`X-Forwarded-*` aware) |
-| `LOCCI_TRUSTED_PROXIES` | loopback and private networks | Reverse proxies whose `X-Forwarded-For`, `-Proto` and `-Host` headers are believed: comma separated IPs or CIDRs, `*` for any, `none` for no proxy. Headers from other clients are ignored |
+| `LOCCI_PUBLIC_URL` | empty | The address people open locci at, such as `https://locci.example.com`. Set it behind any reverse proxy or tunnel: OIDC redirect URIs, the session cookie's `Secure` flag, HSTS and the console's origin check come from it. Without it they come from each request (`X-Forwarded-*` from trusted proxies). See [REVERSE_PROXY.md](REVERSE_PROXY.md) |
+| `LOCCI_TRUSTED_PROXIES` | loopback, private networks and `100.64.0.0/10` | Reverse proxies whose `X-Forwarded-For`, `-Proto` and `-Host` headers are believed: comma separated IPs or CIDRs, `*` for any, `none` for no proxy. Headers from other clients are ignored |
 | `LOCCI_TOKEN_TTL_DAYS` | `30` | Days a sign-in (API token) stays valid without use; each use pushes the expiry back. `0` means tokens never expire |
 | `LOCCI_USER_HOST_ACCESS` | `false` | `true` lets plain users mount host paths, set Traefik labels and touch protected containers, as admins can. See [SECURITY.md](SECURITY.md#what-locci-can-do) |
 | `DOCKER_HOST` | empty | Docker daemon for the `local` environment. Empty means the local socket. `DOCKER_TLS_VERIFY` and `DOCKER_CERT_PATH` are honoured too |

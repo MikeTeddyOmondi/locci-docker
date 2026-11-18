@@ -120,6 +120,10 @@ func (s *Server) containerLogs(c *gin.Context) {
 
 	c.Header("Content-Type", "text/plain; charset=utf-8")
 	c.Header("X-Content-Type-Options", "nosniff")
+	// Stream line by line through NGINX (which buffers responses otherwise)
+	// and anything else honouring it.
+	c.Header("X-Accel-Buffering", "no")
+	c.Header("Cache-Control", "no-cache")
 	c.Status(http.StatusOK)
 
 	r := bufio.NewReader(rc)

@@ -84,8 +84,6 @@ It needs no ports and no volume.
   the stored remote-host keys.
 - **Turso instead of a file:** set `DATABASE_URL=libsql://<db>.turso.io?authToken=...`
   and the volume becomes optional.
-- **Behind a reverse proxy**, forward WebSockets for
-  `/api/v1/.../exec/ws` (the web console) and `/api/v1/agent/connect`
-  (agents), don't time out idle WebSockets too eagerly (agents send a
-  keepalive every 20 seconds), and keep the `Host` header: the WebSocket
-  origin check compares the browser's `Origin` with it.
+- **Behind a reverse proxy or tunnel** (Traefik, NGINX, Caddy, Cloudflare,
+  NetBird, Tailscale), set `LOCCI_PUBLIC_URL` and pass WebSockets through;
+  [REVERSE_PROXY.md](REVERSE_PROXY.md) has configurations for each.

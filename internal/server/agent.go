@@ -29,7 +29,7 @@ func (s *Server) agentConnect(c *gin.Context) {
 	}
 
 	// Tell the agent which environment it serves.
-	ws, err := upgrader.Upgrade(c.Writer, c.Request, http.Header{"X-Locci-Environment": {e.Name}})
+	ws, err := s.upgrader().Upgrade(c.Writer, c.Request, http.Header{"X-Locci-Environment": {e.Name}})
 	if err != nil {
 		return // the upgrader already answered
 	}

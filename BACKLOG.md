@@ -205,11 +205,13 @@ From a review in November 2026. Done:
 - [x] Go 1.27.4 and latest dependencies; pure-Go SQLite instead of go-libsql
   (whose bitcode-laden libraries patched Go refuses to link)
 - [x] CI (tests, `bun run check`, govulncheck) and signed releases
+- [x] web sign-in in an HttpOnly cookie with a CSRF header; works behind
+  Traefik, NGINX, Cloudflare and overlays (tested with NGINX, Traefik and Dex)
+- [x] container actions only in the options menu, disabled with the reason
+  for protected containers; the username lockout spares known addresses
 
 Open:
 
-- [ ] Web token in an HttpOnly cookie instead of local storage, with CSRF
-  protection (the CSP limits the damage meanwhile)
 - [ ] Per-environment access for users (also in section 1)
 
 ---

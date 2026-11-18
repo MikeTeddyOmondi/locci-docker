@@ -355,6 +355,20 @@ that is an API server, a web UI and a CLI.
   The binary is static (`CGO_ENABLED=0`), existing database files open
   unchanged, and the Dockerfile cross-compiles per platform instead of
   emulating. `locci --version` reports the build's version.
+- The web UI's sign-in is an HttpOnly session cookie instead of a token in
+  local storage, so page scripts can't read it. Requests that change
+  something need an `X-Locci-CSRF` header alongside the cookie; the CLI and
+  API clients keep bearer tokens. A token already in local storage is moved
+  into the cookie once (`POST /auth/session`), so nobody is signed out.
+  Single sign-on in the browser sets the cookie instead of returning the
+  token in the URL fragment.
+- Works behind reverse proxies and tunnels: `LOCCI_PUBLIC_URL` decides the
+  redirect URIs, the cookie's `Secure` flag, HSTS and the console's origin
+  check; the console accepts the public host from it or from a trusted
+  `X-Forwarded-Host` when the proxy rewrites `Host`; the console pings every
+  30 seconds so proxies don't close it; log streams send
+  `X-Accel-Buffering: no`; `100.64.0.0/10` (NetBird, Tailscale) is trusted
+  by default. New guide: `docs/REVERSE_PROXY.md`.
 - Container actions live in one options menu (list rows, cards and the
   container page) instead of a Stop/Start button beside it; the menu lists
   what fits the state and shows a spinner while an action runs. For plain

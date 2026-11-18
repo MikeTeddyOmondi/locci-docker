@@ -9,7 +9,7 @@ import (
 )
 
 func TestParseProxies(t *testing.T) {
-	for in, want := range map[string]int{"": 6, "none": 0, "*": 2, "10.1.2.3, fd00::1, 192.168.0.0/16": 3} {
+	for in, want := range map[string]int{"": 7, "none": 0, "*": 2, "10.1.2.3, fd00::1, 192.168.0.0/16": 3} {
 		got, err := ParseProxies(in)
 		if err != nil || len(got) != want {
 			t.Errorf("%q: %v %v", in, got, err)

@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"net"
+	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -10,8 +11,9 @@ import (
 
 // DefaultProxies are trusted when LOCCI_TRUSTED_PROXIES is unset: loopback and
 // private networks, where a reverse proxy in front of locci normally sits
-// (the same host, a Docker network, a LAN).
-const DefaultProxies = "127.0.0.0/8,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,fc00::/7"
+// (the same host, a Docker network, a LAN, a cloudflared or Traefik
+// container), plus 100.64.0.0/10, the overlay range of NetBird and Tailscale.
+const DefaultProxies = "127.0.0.0/8,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.64.0.0/10,fc00::/7"
 
 // ParseProxies parses LOCCI_TRUSTED_PROXIES: comma separated IPs or CIDRs,
 // "*" for any address, "none" for no proxy at all. Empty means DefaultProxies.
@@ -69,9 +71,14 @@ func (s *Server) proxies() []*net.IPNet {
 // fromTrustedProxy reports whether the request came straight from a trusted
 // proxy, so its X-Forwarded-* headers may be believed.
 func (s *Server) fromTrustedProxy(c *gin.Context) bool {
-	host, _, err := net.SplitHostPort(c.Request.RemoteAddr)
+	return s.trustedPeer(c.Request)
+}
+
+// trustedPeer is fromTrustedProxy for a plain request.
+func (s *Server) trustedPeer(r *http.Request) bool {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
-		host = c.Request.RemoteAddr
+		host = r.RemoteAddr
 	}
 	ip := net.ParseIP(host)
 	if ip == nil {

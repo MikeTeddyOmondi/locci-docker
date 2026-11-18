@@ -90,5 +90,7 @@ environment: `POST/GET /api/v1/networks`, `POST/GET /api/v1/containers`,
 
 - The binary is pure Go and static (`CGO_ENABLED=0`), so it cross-compiles
   anywhere. Signed release binaries and images: [docs/RELEASING.md](docs/RELEASING.md).
+- Behind Traefik, NGINX, Cloudflare, NetBird and the like: set
+  `LOCCI_PUBLIC_URL`; see [docs/REVERSE_PROXY.md](docs/REVERSE_PROXY.md).
 - Access to a Docker socket is root on that host. Serve locci over HTTPS and
   read [docs/SECURITY.md](docs/SECURITY.md).
