@@ -34,6 +34,15 @@ type Provider struct {
 	userinfo map[string]any // extra claims served at /userinfo
 	deny     bool
 	codes    map[string]grant
+
+	NoDevice bool               // hide the device endpoint from discovery
+	devices  map[string]*device // device_code -> state
+	lastDev  string
+}
+
+type device struct {
+	approved, denied bool
+	claims           map[string]any
 }
 
 type grant struct {
@@ -48,7 +57,7 @@ func New(t testing.TB) *Provider {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := &Provider{ClientID: "locci", ClientSecret: "s3cret", key: key, codes: map[string]grant{}}
+	p := &Provider{ClientID: "locci", ClientSecret: "s3cret", key: key, codes: map[string]grant{}, devices: map[string]*device{}}
 	srv := httptest.NewServer(p)
 	t.Cleanup(srv.Close)
 	p.URL = srv.URL
@@ -67,6 +76,24 @@ func (p *Provider) SetUserInfo(claims map[string]any) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.userinfo = claims
+}
+
+// ApproveDevice approves the latest device code as the SetUser user.
+func (p *Provider) ApproveDevice() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if d := p.devices[p.lastDev]; d != nil {
+		d.approved, d.claims = true, p.claims
+	}
+}
+
+// DenyDevice refuses the latest device code.
+func (p *Provider) DenyDevice() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if d := p.devices[p.lastDev]; d != nil {
+		d.denied = true
+	}
 }
 
 // Deny makes the next authorization fail with access_denied.
@@ -90,7 +117,7 @@ func writeJSON(w http.ResponseWriter, v any) {
 func (p *Provider) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
 	case "/.well-known/openid-configuration":
-		writeJSON(w, map[string]any{
+		doc := map[string]any{
 			"issuer":                                p.URL,
 			"authorization_endpoint":                p.URL + "/auth",
 			"token_endpoint":                        p.URL + "/token",
@@ -100,7 +127,13 @@ func (p *Provider) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			"subject_types_supported":               []string{"public"},
 			"id_token_signing_alg_values_supported": []string{"RS256"},
 			"code_challenge_methods_supported":      []string{"S256"},
-		})
+		}
+		if !p.NoDevice {
+			doc["device_authorization_endpoint"] = p.URL + "/device"
+		}
+		writeJSON(w, doc)
+	case "/device":
+		p.deviceAuth(w, r)
 	case "/jwks":
 		writeJSON(w, jose.JSONWebKeySet{Keys: []jose.JSONWebKey{{Key: &p.key.PublicKey, KeyID: "k1", Algorithm: "RS256", Use: "sig"}}})
 	case "/auth":
@@ -144,11 +177,67 @@ func (p *Provider) authorize(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, back.String(), http.StatusFound)
 }
 
+// clientOK checks client_secret_basic (form-decoded) or client_secret_post.
+func (p *Provider) clientOK(r *http.Request) bool {
+	id, sec, ok := r.BasicAuth()
+	if ok {
+		id, _ = url.QueryUnescape(id)
+		sec, _ = url.QueryUnescape(sec)
+	} else {
+		id, sec = r.PostForm.Get("client_id"), r.PostForm.Get("client_secret")
+	}
+	return id == p.ClientID && sec == p.ClientSecret
+}
+
+func (p *Provider) deviceAuth(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	if !p.clientOK(r) {
+		w.WriteHeader(http.StatusUnauthorized)
+		writeJSON(w, map[string]string{"error": "invalid_client"})
+		return
+	}
+	code := random()
+	p.mu.Lock()
+	p.devices[code] = &device{}
+	p.lastDev = code
+	p.mu.Unlock()
+	writeJSON(w, map[string]any{
+		"device_code": code, "user_code": "ABCD-EFGH", "verification_uri": p.URL + "/activate",
+		"verification_uri_complete": p.URL + "/activate?code=ABCD-EFGH", "expires_in": 600, "interval": 1,
+	})
+}
+
+// deviceGrant answers a device_code token request.
+func (p *Provider) deviceGrant(w http.ResponseWriter, r *http.Request) {
+	p.mu.Lock()
+	d := p.devices[r.PostForm.Get("device_code")]
+	p.mu.Unlock()
+	fail := func(e string) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": e})
+	}
+	switch {
+	case d == nil:
+		fail("invalid_grant")
+	case d.denied:
+		fail("access_denied")
+	case !d.approved:
+		fail("authorization_pending")
+	default:
+		p.issue(w, d.claims, "")
+	}
+}
+
 func (p *Provider) token(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
-	id, sec, ok := r.BasicAuth()
-	if !ok {
-		id, sec = r.PostForm.Get("client_id"), r.PostForm.Get("client_secret")
+	if !p.clientOK(r) {
+		http.Error(w, `{"error":"invalid_client"}`, http.StatusUnauthorized)
+		return
+	}
+	if r.PostForm.Get("grant_type") == "urn:ietf:params:oauth:grant-type:device_code" {
+		p.deviceGrant(w, r)
+		return
 	}
 	p.mu.Lock()
 	g, found := p.codes[r.PostForm.Get("code")]
@@ -157,9 +246,6 @@ func (p *Provider) token(w http.ResponseWriter, r *http.Request) {
 
 	sum := sha256.Sum256([]byte(r.PostForm.Get("code_verifier")))
 	switch {
-	case id != p.ClientID || sec != p.ClientSecret:
-		http.Error(w, `{"error":"invalid_client"}`, http.StatusUnauthorized)
-		return
 	case !found || r.PostForm.Get("redirect_uri") != g.redirect:
 		http.Error(w, `{"error":"invalid_grant"}`, http.StatusBadRequest)
 		return
@@ -168,11 +254,19 @@ func (p *Provider) token(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	p.issue(w, g.claims, g.nonce)
+}
+
+// issue writes a token response with an RS256 ID token for the claims.
+func (p *Provider) issue(w http.ResponseWriter, user map[string]any, nonce string) {
 	claims := map[string]any{
-		"iss": p.URL, "aud": p.ClientID, "nonce": g.nonce,
+		"iss": p.URL, "aud": p.ClientID,
 		"iat": time.Now().Unix(), "exp": time.Now().Add(5 * time.Minute).Unix(),
 	}
-	for k, v := range g.claims {
+	if nonce != "" {
+		claims["nonce"] = nonce
+	}
+	for k, v := range user {
 		claims[k] = v
 	}
 	payload, _ := json.Marshal(claims)

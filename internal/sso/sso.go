@@ -190,15 +190,22 @@ func (s *Service) Finish(ctx context.Context, p store.Provider, redirectURL stri
 		s.Forget(p.IssuerURL)
 		return Claims{}, fmt.Errorf("code exchange: %w", err)
 	}
-	rawID, ok := tok.Extra("id_token").(string)
-	if !ok || rawID == "" {
+	rawID, _ := tok.Extra("id_token").(string)
+	return s.verifiedClaims(octx, p, op, tok, rawID, f.Nonce)
+}
+
+// verifiedClaims checks an ID token (issuer, audience, expiry, and the nonce
+// when one was sent) and returns its claims, filling email and groups from
+// userinfo when the token lacks them. Shared by the browser and device flows.
+func (s *Service) verifiedClaims(octx context.Context, p store.Provider, op *oidc.Provider, tok *oauth2.Token, rawID, nonce string) (Claims, error) {
+	if rawID == "" {
 		return Claims{}, errors.New("the provider returned no ID token (is the openid scope allowed?)")
 	}
 	idt, err := op.Verifier(&oidc.Config{ClientID: p.ClientID}).Verify(octx, rawID)
 	if err != nil {
 		return Claims{}, fmt.Errorf("ID token: %w", err)
 	}
-	if idt.Nonce != f.Nonce {
+	if nonce != "" && idt.Nonce != nonce {
 		return Claims{}, errors.New("ID token nonce doesn't match; start again")
 	}
 
@@ -210,7 +217,7 @@ func (s *Service) Finish(ctx context.Context, p store.Provider, redirectURL stri
 	c.Subject = idt.Subject
 
 	// Some providers only put email or groups in userinfo.
-	if c.Email == "" || len(c.Groups) == 0 {
+	if (c.Email == "" || len(c.Groups) == 0) && tok.AccessToken != "" {
 		if ui, err := op.UserInfo(octx, oauth2.StaticTokenSource(tok)); err == nil && ui.Subject == c.Subject {
 			more := map[string]any{}
 			if ui.Claims(&more) == nil {
