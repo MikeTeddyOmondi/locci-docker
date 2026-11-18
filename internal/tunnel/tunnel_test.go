@@ -55,7 +55,7 @@ func server(t *testing.T, hub *Hub) string {
 		if err != nil {
 			return
 		}
-		hub.Attach(1, NewConn(ws))
+		hub.Attach(1, NewConn(ws), nil)
 	}))
 	t.Cleanup(ts.Close)
 	return "ws" + strings.TrimPrefix(ts.URL, "http")

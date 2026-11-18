@@ -28,8 +28,9 @@ type Hub struct {
 }
 
 // Attach makes conn the tunnel for an environment, replacing (and closing)
-// any previous one, and returns once the tunnel closes.
-func (h *Hub) Attach(envID int64, conn net.Conn) error {
+// any previous one, and returns once the tunnel closes. ready, if not nil,
+// runs as soon as the environment can be dialled.
+func (h *Hub) Attach(envID int64, conn net.Conn, ready func()) error {
 	// The server opens streams, so it is yamux's client side.
 	sess, err := yamux.Client(conn, config())
 	if err != nil {
@@ -44,6 +45,9 @@ func (h *Hub) Attach(envID int64, conn net.Conn) error {
 	}
 	h.sessions[envID] = sess
 	h.mu.Unlock()
+	if ready != nil {
+		ready() // the environment can be dialled from here on
+	}
 
 	<-sess.CloseChan()
 

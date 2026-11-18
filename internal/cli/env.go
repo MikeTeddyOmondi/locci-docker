@@ -87,7 +87,10 @@ func envLsCmd() *cobra.Command {
 					def = "yes"
 				}
 				u := e.URL
-				if u == "" {
+				switch {
+				case e.Kind == "agent":
+					u = "(outbound agent)"
+				case u == "":
 					u = "(local socket)"
 				}
 				rows = append(rows, []string{mark, e.Name, e.Kind, u, e.Status, def, e.LastSeenAt})

@@ -36,9 +36,9 @@ func (s *Server) agentConnect(c *gin.Context) {
 	who := "agent:" + e.Name
 	s.Log.Info("agent connected", "env", e.Name, "remote", c.ClientIP())
 	_ = s.Store.Audit(who, "CONNECT", c.Request.URL.Path, http.StatusSwitchingProtocols)
-	s.checkSoon(e)
-
-	_ = s.Envs.Hub.Attach(e.ID, tunnel.NewConn(ws)) // blocks until the tunnel closes
+	// Check the status once the tunnel is registered, so the UI shows the
+	// environment up right away instead of at the next health tick.
+	_ = s.Envs.Hub.Attach(e.ID, tunnel.NewConn(ws), func() { s.checkSoon(e) }) // blocks until the tunnel closes
 
 	s.Log.Info("agent disconnected", "env", e.Name)
 	_ = s.Store.Audit(who, "DISCONNECT", c.Request.URL.Path, http.StatusOK)
