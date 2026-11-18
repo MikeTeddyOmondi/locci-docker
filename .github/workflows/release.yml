@@ -181,14 +181,16 @@ jobs:
         env:
           GPG_PASSPHRASE: ${{ secrets.RELEASE_GPG_PASSPHRASE }}
         run: |
-          for f in locci-* SHA256SUMS; do
+          # The list is taken once: after signing, locci-* also matches the .asc files.
+          files=$(ls locci-* SHA256SUMS)
+          for f in $files; do
             echo "$GPG_PASSPHRASE" | gpg --batch --yes --passphrase-fd 0 \
               --pinentry-mode loopback --detach-sign --armor "$f"
           done
           # Check against the published public key alone, as users will.
           mkdir -m 700 "$RUNNER_TEMP/verify"
           gpg --homedir "$RUNNER_TEMP/verify" --batch --import release-key.asc
-          for f in locci-* SHA256SUMS; do
+          for f in $files; do
             gpg --homedir "$RUNNER_TEMP/verify" --batch --verify "$f.asc" "$f"
           done
 
