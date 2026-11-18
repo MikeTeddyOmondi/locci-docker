@@ -33,23 +33,27 @@ docker run -d --name locci -p 8998:8998 \
 `just docker-logs` follows the logs and `just down` removes the container
 (the `locci-data` volume, and with it the database, is kept).
 
+`just up` takes settings such as `LOCCI_SECRET_KEY` from `.env`, but always sets
+`DATABASE_URL`, `DOCKER_HOST`, `SERVER_PORT` and `GIN_MODE` for the container.
+The `.env` values for those are meant for running on the host, such as a
+relative database file or a Colima socket path.
+
 ## Compose
 
-```yaml
-services:
-  locci:
-    image: locci/docker:<tag>   # from `just image tag=<tag>`
-    restart: unless-stopped
-    ports: ["8998:8998"]
-    env_file: .env
-    environment:
-      LOCCI_SECRET_KEY: ${LOCCI_SECRET_KEY}
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - locci-data:/data
-volumes:
-  locci-data:
+[`compose.yaml`](../compose.yaml) runs the same container:
+
+```sh
+just compose-up        # docker compose up -d --build, then http://localhost:8998
+just compose-logs
+just compose-down      # the locci-data volume is kept
 ```
+
+- It builds the image from the current source each time (cached layers keep
+  this quick), so the container never runs stale code.
+- `.env` is optional and works the same way as with `just up`.
+- `LOCCI_PORT=9000 just compose-up` publishes on another port.
+- It uses the same `locci-data` volume as `just up`, so both see one database.
+  Run one of them at a time, since both want port 8998.
 
 ## The agent image
 

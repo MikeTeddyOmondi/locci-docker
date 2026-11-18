@@ -53,6 +53,9 @@ that is an API server, a web UI and a CLI.
   cgo → Debian slim runtime with the database on a `/data` volume);
   `.dockerignore`; `.env.sample` with `DATABASE_URL`; README with quick start,
   layout and the API route list.
+- **compose.yaml** and `just compose-up` / `compose-down` / `compose-logs`:
+  builds the image from source and runs it with the Docker socket, the
+  `locci-data` volume and an optional `.env`.
 - **Justfile** grouped into setup, develop, build, cli, docker and project
   recipes, with a comment on every command: `just cli <args>` runs any CLI
   command from source, and project recipes cover `status`, `branch`, `commit`

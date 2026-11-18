@@ -184,6 +184,25 @@ docker-logs:
     # stream logs until Ctrl+C
     docker logs -f {{ bin }}
 
+# build the image from the current source and start it with compose.yaml
+[group('docker')]
+compose-up tag="dev":
+    # --build keeps the container in step with the code (cached layers make it quick)
+    LOCCI_IMAGE={{ image }}:{{ tag }} docker compose up -d --build
+    @echo "open http://localhost:${LOCCI_PORT:-8998}"
+
+# stop the compose service (the data volume is kept)
+[group('docker')]
+compose-down:
+    # removes the container and network, not the volume
+    docker compose down
+
+# follow the compose service's logs
+[group('docker')]
+compose-logs:
+    # stream logs until Ctrl+C
+    docker compose logs -f
+
 # ---------------------------------------------------------------- project
 
 # branch, uncommitted changes and recent commits

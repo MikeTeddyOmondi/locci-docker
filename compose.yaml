@@ -1,0 +1,31 @@
+# The server (API and web UI on one port) with the host's Docker socket.
+#
+#   just compose-up      build if needed and start
+#   just compose-logs    follow the logs
+#   just compose-down    stop (the database volume is kept)
+#
+# .env is optional and is read for settings such as LOCCI_SECRET_KEY,
+# AUTH_TOKEN or RABBITMQ_URL. The values under `environment` win over it:
+# they are what the container needs, whatever .env says for running on the host.
+services:
+  locci:
+    image: ${LOCCI_IMAGE:-locci/docker:dev}
+    build: .
+    restart: unless-stopped
+    ports:
+      - "${LOCCI_PORT:-8998}:8998"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      SERVER_PORT: "8998"
+      GIN_MODE: release
+      DATABASE_URL: file:/data/locci.db
+      DOCKER_HOST: unix:///var/run/docker.sock
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - locci-data:/data
+
+volumes:
+  locci-data:
+    name: locci-data # the same volume `just up` uses, so both see one database
