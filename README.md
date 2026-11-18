@@ -95,3 +95,13 @@ environment: `POST/GET /api/v1/networks`, `POST/GET /api/v1/containers`,
   `LOCCI_PUBLIC_URL`; see [docs/REVERSE_PROXY.md](docs/REVERSE_PROXY.md).
 - Access to a Docker socket is root on that host. Serve locci over HTTPS and
   read [docs/SECURITY.md](docs/SECURITY.md).
+
+## License
+
+Licensed under either of
+
+- MIT license ([MIT-LICENSE.md](MIT-LICENSE.md))
+- Apache License, Version 2.0 ([APACHE-LICENSE.md](APACHE-LICENSE.md))
+
+at your option. Unless you state otherwise, any contribution you submit for
+inclusion is dual licensed as above, without additional terms or conditions.

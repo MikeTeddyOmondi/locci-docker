@@ -12,6 +12,9 @@ that is an API server, a web UI and a CLI.
 
 ### Added
 
+- **Dual license.** locci is available under the MIT license
+  (`MIT-LICENSE.md`) or the Apache License 2.0 (`APACHE-LICENSE.md`), at your
+  option.
 - **Single binary with a Cobra CLI.** `locci serve` runs the API (and the
   RabbitMQ deploy consumer when `RABBITMQ_URL` is set); `locci user` manages
   users on the server host.
