@@ -2,21 +2,76 @@
 
 ## What locci can do
 
-Access to a Docker socket (local, over TLS or over SSH) is root on that host.
-Every signed-in locci user can manage containers on every environment, so
-treat a locci account like shell access to those machines. Admins can also
-manage users, environments and read the audit log.
+Access to a Docker socket (local, over TLS or over SSH) is root on that host,
+and locci holds that access for every environment.
+
+**Admins** can do anything Docker can on every environment, and manage users,
+environments, single sign-on and the audit log. Treat an admin account like
+root on those machines.
+
+**Plain users** (role `user`) run and manage containers, images, networks and
+volumes, but are kept from the hosts themselves:
+
+- New containers may use named volumes only, not host paths
+  (`/etc:/x`, `./data:/data`, the Docker socket).
+- They can't set `traefik.*` labels (which decide where a domain's traffic
+  goes) or `io.locci.*` labels, and can't take a subdomain another container
+  already routes.
+- They can't start, stop, remove, exec into or open a console in a
+  **protected** container: one labelled `io.locci.protected=true` (the locci
+  image sets it, so the server and its agents are covered), one that is
+  privileged, or one with the Docker socket or the host's `/` bind-mounted
+  (Traefik, Portainer, CI runners). Inspecting one hides its environment
+  variables.
+
+Admins can still do all of that. `LOCCI_USER_HOST_ACCESS=true` lifts the
+limits for everyone, for teams where every user is trusted with the hosts.
+
+The limits close the paths from a plain account to root on a host. They don't
+isolate users from each other: a plain user can still stop, remove or read the
+logs and environment of anyone's unprotected containers, publish ports, and
+run any image. Label a container `io.locci.protected=true` to put it out of
+their reach.
 
 ## Accounts and tokens
 
 - Passwords are stored as bcrypt hashes; they need 8+ characters.
+- Password logins are rate limited: 10 failures from one IP, or 20 for one
+  username from anywhere, within 15 minutes lock that IP or username out until
+  the window ends (HTTP 429). Failures are in the audit log. A login for an
+  unknown username takes as long as a wrong password.
 - Logging in (web UI or `locci login`) issues an API token `lc_<64 hex>`. Only
   its SHA-256 hash is stored; logging out deletes it. Deleting a user deletes
   their tokens.
+- A token expires after `LOCCI_TOKEN_TTL_DAYS` (default 30) without use. Users
+  see and sign out their sessions in the web UI (user menu, Sessions) or with
+  `locci sessions`.
+- The web UI keeps its token in the browser's local storage. The
+  Content-Security-Policy below is what stops injected scripts from reading
+  it; moving it to an HttpOnly cookie is in the backlog.
 - `AUTH_TOKEN` is an optional static admin token for integrations. Leave it
-  empty unless you need it, and treat it like a root password.
-- Request logs record the method, path and status, never the query string
-  (the WebSocket console passes its token as `?token=`).
+  empty unless you need it, and treat it like a root password. It is compared
+  in constant time and never expires.
+- Tokens go in the `Authorization` header. Only WebSocket requests (the
+  console) may pass one as `?token=`, since browsers can't set headers there.
+- Request logs record the method, path and status, never the query string.
+
+## HTTP
+
+- Every response sets a Content-Security-Policy that allows only locci's own
+  scripts (plus SvelteKit's inline bootstrap, by hash), styles, fonts and
+  images, and forbids framing (`frame-ancestors 'none'`, `X-Frame-Options:
+  DENY`); also `X-Content-Type-Options: nosniff`, `Referrer-Policy:
+  no-referrer`, and HSTS over HTTPS.
+- Request bodies are limited to 1 MiB and request headers must arrive within
+  10 seconds. There is no overall timeout, since log streams, image pulls, the
+  console and agents stay open.
+- `X-Forwarded-For`, `-Proto` and `-Host` are believed only from
+  `LOCCI_TRUSTED_PROXIES` (default loopback and private networks). If clients
+  can reach locci directly from such a network, narrow it to your proxy's
+  address.
+- SIGTERM stops locci gracefully: running requests and a running deploy job
+  get up to 25 seconds.
 
 ## Single sign-on
 
@@ -86,7 +141,10 @@ by `locci audit`. Logins are recorded too.
 
 ## Deployment checklist
 
-- Serve locci over HTTPS only.
+- Serve locci over HTTPS only, and set `LOCCI_TRUSTED_PROXIES` to your
+  reverse proxy if anything else shares its network.
+- Give people the plain `user` role unless they need admin; keep
+  `LOCCI_USER_HOST_ACCESS` off.
 - Set `LOCCI_SECRET_KEY` and back it up with the database.
 - Keep `AUTH_TOKEN` empty unless an integration needs it.
 - Create named admin accounts (`locci user add NAME --admin`) instead of
