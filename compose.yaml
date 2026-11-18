@@ -1,0 +1,139 @@
+# The server (API and web UI on one port) with the host's Docker socket.
+#
+#   just compose-up      build if needed and start
+#   just compose-logs    follow the logs
+#   just compose-down    stop (the data volumes are kept)
+#
+# Identity providers for single sign-on, off unless you ask for them. They run
+# in production mode, so set their secrets in .env first (docs/DOCKER.md):
+#
+#   just compose-up keycloak     or: docker compose --profile keycloak up -d
+#   just compose-up pocket-id    or: docker compose --profile pocket-id up -d
+#
+# .env is optional for locci alone and is read for settings such as
+# LOCCI_SECRET_KEY, AUTH_TOKEN or RABBITMQ_URL. The values under `environment`
+# win over it: they are what the container needs, whatever .env says for
+# running on the host.
+#
+# locci and the identity providers share one network namespace, held by the
+# small `net` service (like a Kubernetes pod). So http://localhost:8180 is
+# Keycloak both for your browser and for locci, and a localhost issuer URL
+# works from both sides. Ports are published on `net`, and rebuilding locci
+# doesn't disturb the others.
+services:
+  net:
+    image: registry.k8s.io/pause:3.10
+    container_name: locci-docker-net
+    restart: unless-stopped
+    ports:
+      - "${LOCCI_PORT:-8998}:8998"
+      - "${KEYCLOAK_PORT:-8180}:${KEYCLOAK_PORT:-8180}"
+      - "${POCKET_ID_PORT:-1411}:${POCKET_ID_PORT:-1411}"
+
+  locci:
+    image: ${LOCCI_IMAGE:-locci/docker:latest}
+    container_name: locci-docker
+    build: .
+    network_mode: service:net
+    depends_on: [net]
+    restart: unless-stopped
+    stop_grace_period: 30s # time to finish running requests and a deploy job
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      SERVER_PORT: "8998"
+      GIN_MODE: release
+      DATABASE_URL: file:/data/locci.db
+      DOCKER_HOST: unix:///var/run/docker.sock
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - locci-docker-data:/data
+
+  # Keycloak in production mode with PostgreSQL (docs/oidc/KEYCLOAK.md).
+  # TLS is expected at a reverse proxy in front of it; KEYCLOAK_URL is the
+  # address people and locci use.
+  keycloak:
+    profiles: ["keycloak"]
+    image: quay.io/keycloak/keycloak:26.0.7
+    container_name: locci-docker-keycloak
+    network_mode: service:net
+    depends_on:
+      net:
+        condition: service_started
+      keycloak-db:
+        condition: service_healthy
+    restart: unless-stopped
+    # Compose can't require a variable for one profile only, so the check is here.
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        if [ -z "$$KC_BOOTSTRAP_ADMIN_PASSWORD" ] || [ -z "$$KC_DB_PASSWORD" ]; then
+          echo "set KEYCLOAK_ADMIN_PASSWORD and KEYCLOAK_DB_PASSWORD in .env (docs/DOCKER.md)" >&2
+          exit 1
+        fi
+        exec /opt/keycloak/bin/kc.sh start
+    environment:
+      KC_HOSTNAME: "${KEYCLOAK_URL:-http://localhost:8180}"
+      KC_HTTP_ENABLED: "true" # TLS ends at the proxy
+      KC_HTTP_PORT: "${KEYCLOAK_PORT:-8180}"
+      KC_PROXY_HEADERS: xforwarded
+      KC_HEALTH_ENABLED: "true"
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: "${KEYCLOAK_DB_PASSWORD:-}"
+      KC_BOOTSTRAP_ADMIN_USERNAME: "${KEYCLOAK_ADMIN:-admin}"
+      KC_BOOTSTRAP_ADMIN_PASSWORD: "${KEYCLOAK_ADMIN_PASSWORD:-}"
+
+  keycloak-db:
+    profiles: ["keycloak"]
+    image: postgres:17-alpine
+    container_name: locci-docker-keycloak-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: "${KEYCLOAK_DB_PASSWORD:-}" # postgres refuses to start without it
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "keycloak", "-d", "keycloak"]
+      interval: 5s
+      retries: 20
+    volumes:
+      - locci-docker-keycloak-db:/var/lib/postgresql/data
+
+  # Pocket ID (passkeys only) in production mode (docs/oidc/POCKETID.md).
+  # TLS is expected at a reverse proxy in front of it; POCKET_ID_URL is the
+  # address people and locci use. First run: <POCKET_ID_URL>/setup.
+  pocket-id:
+    profiles: ["pocket-id"]
+    image: ghcr.io/pocket-id/pocket-id:v1.16.0
+    container_name: locci-docker-pocket-id
+    network_mode: service:net
+    depends_on: [net]
+    restart: unless-stopped
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        if [ "$${#ENCRYPTION_KEY}" -lt 32 ]; then
+          echo "set POCKET_ID_ENCRYPTION_KEY in .env: openssl rand -base64 32 (docs/DOCKER.md)" >&2
+          exit 1
+        fi
+        exec /app/docker/entrypoint.sh /app/pocket-id
+    environment:
+      APP_URL: "${POCKET_ID_URL:-http://localhost:1411}"
+      PORT: "${POCKET_ID_PORT:-1411}"
+      TRUST_PROXY: "true"
+      ENCRYPTION_KEY: "${POCKET_ID_ENCRYPTION_KEY:-}"
+    volumes:
+      - locci-docker-pocket-id-data:/app/data
+
+volumes:
+  locci-docker-data:
+    name: locci-docker-data # the same volume `just up` uses, so both see one database
+  locci-docker-keycloak-db:
+    name: locci-docker-keycloak-db
+  locci-docker-pocket-id-data:
+    name: locci-docker-pocket-id-data

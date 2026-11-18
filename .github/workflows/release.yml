@@ -1,0 +1,243 @@
+name: Release
+
+# Push a tag such as v0.2.0 to publish:
+#   - binaries for Linux, macOS and Windows (amd64, arm64), each with a GPG
+#     signature (.asc), a checksums file, and a GitHub build provenance
+#     attestation (gh attestation verify);
+#   - the multi-arch image docker.io/locci/docker:<version> and :latest,
+#     signed with cosign (keyless, Sigstore) and attested.
+# See docs/RELEASING.md for the secrets and how to verify a download.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+env:
+  IMAGE: docker.io/locci/docker
+  PKG: github.com/MikeTeddyOmondi/locci-docker
+
+jobs:
+  # The web UI is the same for every target: build it once.
+  web:
+    name: Web UI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.3
+      - name: Build
+        working-directory: web
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ui-dist
+          path: internal/ui/dist
+          include-hidden-files: true
+
+  binaries:
+    name: Build ${{ matrix.goos }}/${{ matrix.goarch }}
+    needs: web
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { goos: linux, goarch: amd64 }
+          - { goos: linux, goarch: arm64 }
+          - { goos: darwin, goarch: amd64 }
+          - { goos: darwin, goarch: arm64 }
+          - { goos: windows, goarch: amd64 }
+          - { goos: windows, goarch: arm64 }
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: ui-dist
+          path: internal/ui/dist
+
+      # Pure Go, so every target cross-compiles from one Linux runner.
+      - name: Build and package
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          name=locci-${GITHUB_REF_NAME}-${GOOS}-${GOARCH}
+          ext=""; [ "$GOOS" = windows ] && ext=.exe
+          mkdir -p "dist/$name"
+          go build -trimpath -ldflags "-s -w -X $PKG/internal/cli.Version=$GITHUB_REF_NAME" \
+            -o "dist/$name/locci$ext" ./cmd/locci
+          cp README.md LICENSE* "dist/$name/" 2>/dev/null || true
+          cd dist
+          if [ "$GOOS" = windows ]; then zip -qr "$name.zip" "$name"; else tar czf "$name.tar.gz" "$name"; fi
+          rm -rf "$name"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bin-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/*
+
+  image:
+    name: Docker image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # cosign keyless signing and provenance
+      attestations: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
+
+      # The Dockerfile cross-compiles Go per platform: no QEMU needed.
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: VERSION=${{ github.ref_name }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: mode=max
+          sbom: true
+
+      - uses: sigstore/cosign-installer@v3
+      - name: Sign the image (keyless)
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: cosign sign --yes "$IMAGE@$DIGEST"
+
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
+  release:
+    name: GitHub release
+    needs: [binaries, image]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: bin-*
+          path: dist
+          merge-multiple: true
+
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum locci-* > SHA256SUMS && cat SHA256SUMS
+
+      # The public key users verify with, from the repository (uploaded with
+      # the other .asc files). The signing step fails if the key doesn't match.
+      - name: Public key
+        run: cp docs/release-key.asc dist/release-key.asc
+
+      # A checksum beside a file only proves it wasn't corrupted; anyone who can
+      # replace the archive can replace its checksum. The GPG signatures and
+      # the provenance attestation prove this workflow produced them.
+      - name: Import the GPG signing key
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.RELEASE_GPG_KEY }}
+        run: |
+          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+          echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
+          gpgconf --kill gpg-agent
+
+      - name: Sign
+        working-directory: dist
+        env:
+          GPG_PASSPHRASE: ${{ secrets.RELEASE_GPG_PASSPHRASE }}
+        run: |
+          for f in locci-* SHA256SUMS; do
+            echo "$GPG_PASSPHRASE" | gpg --batch --yes --passphrase-fd 0 \
+              --pinentry-mode loopback --detach-sign --armor "$f"
+          done
+          # Check against the published public key alone, as users will.
+          mkdir -m 700 "$RUNNER_TEMP/verify"
+          gpg --homedir "$RUNNER_TEMP/verify" --batch --import release-key.asc
+          for f in locci-* SHA256SUMS; do
+            gpg --homedir "$RUNNER_TEMP/verify" --batch --verify "$f.asc" "$f"
+          done
+
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/locci-*
+
+      # The curated notes live in CHANGELOG.md: use this version's section.
+      - name: Release notes
+        run: |
+          bare="${GITHUB_REF_NAME#v}"
+          awk -v v="$bare" '
+            $0 ~ "^## \\[?" v "\\]?" { found = 1; next }
+            found && /^## / { exit }
+            found { print }
+          ' CHANGELOG.md > NOTES.md
+          [ -s NOTES.md ] || echo "See the commits below." > NOTES.md
+          cat >> NOTES.md <<EOF
+
+          ### Docker
+
+          \`\`\`sh
+          docker pull $IMAGE:${bare}
+          cosign verify $IMAGE:${bare} \\
+            --certificate-identity-regexp '^https://github.com/${GITHUB_REPOSITORY}/' \\
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com
+          \`\`\`
+
+          ### Verify a download
+
+          Signing key: \`release-key.asc\` below, fingerprint
+          \`2B9D 1A57 F9B7 7E2E EDFF  0F05 B5E0 0DB4 AAE7 15C3\`
+          (also in docs/RELEASING.md).
+
+          \`\`\`sh
+          gpg --import release-key.asc
+          gpg --verify SHA256SUMS.asc SHA256SUMS
+          sha256sum -c SHA256SUMS --ignore-missing
+          gh attestation verify locci-${GITHUB_REF_NAME}-linux-amd64.tar.gz --repo ${GITHUB_REPOSITORY}
+          \`\`\`
+          EOF
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: locci ${{ github.ref_name }}
+          body_path: NOTES.md
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: |
+            dist/locci-*
+            dist/SHA256SUMS
+            dist/*.asc

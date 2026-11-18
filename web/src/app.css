@@ -1,0 +1,224 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn-svelte/tailwind.css';
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/bricolage-grotesque';
+@import '@fontsource-variable/jetbrains-mono';
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * "Night harbor" palette: warm manifest paper by day, deep navy water by
+ * night, with international orange (the shipping container colour) as the
+ * one loud accent. Signal colours mirror harbour lights.
+ */
+:root {
+	--radius: 0.7rem;
+	--background: oklch(0.975 0.008 85);
+	--foreground: oklch(0.22 0.025 255);
+	--card: oklch(0.993 0.004 85);
+	--card-foreground: oklch(0.22 0.025 255);
+	--popover: oklch(0.993 0.004 85);
+	--popover-foreground: oklch(0.22 0.025 255);
+	--primary: oklch(0.63 0.19 42);
+	--primary-foreground: oklch(0.99 0.01 85);
+	--secondary: oklch(0.93 0.012 85);
+	--secondary-foreground: oklch(0.26 0.025 255);
+	--muted: oklch(0.945 0.01 85);
+	--muted-foreground: oklch(0.5 0.022 255);
+	--accent: oklch(0.935 0.035 60);
+	--accent-foreground: oklch(0.3 0.06 40);
+	--destructive: oklch(0.57 0.22 27);
+	--border: oklch(0.885 0.012 85);
+	--input: oklch(0.86 0.014 85);
+	--ring: oklch(0.63 0.19 42);
+	--ok: oklch(0.62 0.16 152);
+	--warn: oklch(0.72 0.16 75);
+	--grid: oklch(0.22 0.025 255 / 6%);
+	--sidebar: oklch(0.955 0.012 85);
+	--sidebar-foreground: oklch(0.22 0.025 255);
+	--sidebar-primary: oklch(0.63 0.19 42);
+	--sidebar-primary-foreground: oklch(0.99 0.01 85);
+	--sidebar-accent: oklch(0.92 0.02 75);
+	--sidebar-accent-foreground: oklch(0.22 0.025 255);
+	--sidebar-border: oklch(0.885 0.012 85);
+	--sidebar-ring: oklch(0.63 0.19 42);
+}
+
+.dark {
+	--background: oklch(0.165 0.022 255);
+	--foreground: oklch(0.95 0.01 85);
+	--card: oklch(0.205 0.024 255);
+	--card-foreground: oklch(0.95 0.01 85);
+	--popover: oklch(0.215 0.026 255);
+	--popover-foreground: oklch(0.95 0.01 85);
+	--primary: oklch(0.72 0.18 48);
+	--primary-foreground: oklch(0.18 0.03 40);
+	--secondary: oklch(0.26 0.024 255);
+	--secondary-foreground: oklch(0.95 0.01 85);
+	--muted: oklch(0.245 0.022 255);
+	--muted-foreground: oklch(0.7 0.02 250);
+	--accent: oklch(0.3 0.045 50);
+	--accent-foreground: oklch(0.95 0.03 70);
+	--destructive: oklch(0.68 0.2 25);
+	--border: oklch(1 0 0 / 9%);
+	--input: oklch(1 0 0 / 13%);
+	--ring: oklch(0.72 0.18 48);
+	--ok: oklch(0.76 0.17 152);
+	--warn: oklch(0.82 0.15 80);
+	--grid: oklch(1 0 0 / 4.5%);
+	--sidebar: oklch(0.185 0.024 255);
+	--sidebar-foreground: oklch(0.95 0.01 85);
+	--sidebar-primary: oklch(0.72 0.18 48);
+	--sidebar-primary-foreground: oklch(0.18 0.03 40);
+	--sidebar-accent: oklch(0.255 0.03 255);
+	--sidebar-accent-foreground: oklch(0.95 0.01 85);
+	--sidebar-border: oklch(1 0 0 / 8%);
+	--sidebar-ring: oklch(0.72 0.18 48);
+}
+
+@theme inline {
+	--font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+	--font-heading: 'Bricolage Grotesque Variable', 'Inter Variable', ui-sans-serif, sans-serif;
+	--font-mono: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, monospace;
+	--radius-sm: calc(var(--radius) - 4px);
+	--radius-md: calc(var(--radius) - 2px);
+	--radius-lg: var(--radius);
+	--radius-xl: calc(var(--radius) + 4px);
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--color-card: var(--card);
+	--color-card-foreground: var(--card-foreground);
+	--color-popover: var(--popover);
+	--color-popover-foreground: var(--popover-foreground);
+	--color-primary: var(--primary);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-secondary: var(--secondary);
+	--color-secondary-foreground: var(--secondary-foreground);
+	--color-muted: var(--muted);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-accent: var(--accent);
+	--color-accent-foreground: var(--accent-foreground);
+	--color-destructive: var(--destructive);
+	--color-border: var(--border);
+	--color-input: var(--input);
+	--color-ring: var(--ring);
+	--color-ok: var(--ok);
+	--color-warn: var(--warn);
+	--color-sidebar: var(--sidebar);
+	--color-sidebar-foreground: var(--sidebar-foreground);
+	--color-sidebar-primary: var(--sidebar-primary);
+	--color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+	--color-sidebar-accent: var(--sidebar-accent);
+	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+	--color-sidebar-border: var(--sidebar-border);
+	--color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+	* {
+		@apply border-border outline-ring/50;
+	}
+	html {
+		-webkit-tap-highlight-color: transparent;
+	}
+	/* Tailwind v4 resets buttons to the default cursor; anything clickable gets a hand. */
+	button:not(:disabled),
+	[role='button']:not([aria-disabled='true']),
+	[role='menuitem']:not([data-disabled]),
+	[role='menuitemradio']:not([data-disabled]),
+	[role='menuitemcheckbox']:not([data-disabled]),
+	[role='option']:not([data-disabled]),
+	[role='tab']:not([data-disabled]),
+	[role='switch']:not([data-disabled]),
+	[role='checkbox']:not([data-disabled]),
+	label:has(> [role='switch']) {
+		cursor: pointer;
+	}
+	body {
+		@apply bg-background text-foreground font-sans antialiased;
+		/* faint chart-table grid, like a harbour plan */
+		background-image:
+			linear-gradient(var(--grid) 1px, transparent 1px),
+			linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+		background-size: 28px 28px;
+		background-attachment: fixed;
+	}
+	h1,
+	h2,
+	h3 {
+		@apply font-heading tracking-tight;
+	}
+	code,
+	pre,
+	kbd {
+		@apply font-mono;
+	}
+}
+
+/* Mono, spaced-out label used above headings and in stat tiles. */
+@utility kicker {
+	@apply font-mono text-[0.68rem] font-medium tracking-[0.18em] uppercase text-muted-foreground;
+}
+
+/* Corrugated steel, the side of a shipping container. */
+@utility ribbed {
+	background-image: repeating-linear-gradient(
+		90deg,
+		color-mix(in oklch, currentColor 14%, transparent) 0 2px,
+		transparent 2px 9px
+	);
+}
+
+/* Yellow-and-ink hazard tape for destructive zones. */
+@utility hazard {
+	background-image: repeating-linear-gradient(
+		-45deg,
+		var(--warn) 0 10px,
+		var(--foreground) 10px 20px
+	);
+}
+
+/* Harbour signal light: a dot with a slow sonar ring when live. */
+@utility signal {
+	@apply relative inline-block size-2 shrink-0 rounded-full bg-current;
+}
+@utility signal-live {
+	&::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		border-radius: 9999px;
+		background: currentColor;
+		animation: sonar 2.2s cubic-bezier(0, 0, 0.2, 1) infinite;
+	}
+}
+@keyframes sonar {
+	0% {
+		transform: scale(1);
+		opacity: 0.55;
+	}
+	80%,
+	100% {
+		transform: scale(3);
+		opacity: 0;
+	}
+}
+
+/* Staggered entrance for page sections. */
+@utility rise {
+	animation: rise 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes rise {
+	from {
+		opacity: 0;
+		transform: translateY(6px);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.rise,
+	.signal-live::after {
+		animation: none;
+	}
+}

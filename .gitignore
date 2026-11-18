@@ -1,3 +1,9 @@
 ./docker-wrapper
 **/*.env
 docker-wrapper
+/locci
+*.db
+*.db-*
+# built web UI (embedded by internal/ui); keep the placeholder
+/internal/ui/dist/*
+!/internal/ui/dist/.gitkeep

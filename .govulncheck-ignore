@@ -1,0 +1,10 @@
+# Vulnerabilities govulncheck reports as reachable that don't apply to locci.
+# One ID per line; scripts/govulncheck.sh fails on anything not listed here.
+# Remove an entry when its reason no longer holds.
+#
+# Docker daemon (Moby) AuthZ plugin bugs. They live in the daemon; locci only
+# uses the client package of the same module (github.com/docker/docker), so
+# govulncheck counts them, and no client release fixes them. They go away with
+# the move to github.com/moby/moby/client (BACKLOG.md, Later).
+GO-2026-4883
+GO-2026-4887
