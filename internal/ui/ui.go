@@ -39,6 +39,12 @@ func InlineScriptHashes() string {
 	return out.String()
 }
 
+// Built reports whether the web UI was built into this binary.
+func Built() bool {
+	_, err := fs.Stat(dist, "dist/index.html")
+	return err == nil
+}
+
 // Handler serves static files and falls back to index.html for client-side routes.
 func Handler() http.Handler {
 	files, _ := fs.Sub(dist, "dist")

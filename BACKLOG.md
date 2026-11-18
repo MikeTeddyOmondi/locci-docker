@@ -204,12 +204,12 @@ From a review in November 2026. Done:
   WebSockets; constant-time `AUTH_TOKEN`; same timing for unknown usernames
 - [x] Go 1.27.4 and latest dependencies; pure-Go SQLite instead of go-libsql
   (whose bitcode-laden libraries patched Go refuses to link)
+- [x] CI (tests, `bun run check`, govulncheck) and signed releases
 
 Open:
 
 - [ ] Web token in an HttpOnly cookie instead of local storage, with CSRF
   protection (the CSP limits the damage meanwhile)
-- [ ] CI running tests, `bun run check` and govulncheck on every push
 - [ ] Per-environment access for users (also in section 1)
 
 ---

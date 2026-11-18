@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/MikeTeddyOmondi/locci-docker/internal/ui"
 )
 
 // Client-side routes are served index.html with 200; unknown API paths stay
@@ -24,6 +26,9 @@ func TestUIRoutes(t *testing.T) {
 	}
 	if code, out := call(t, "GET", ts.URL+"/api/v1/nope", "static", nil); code != 404 || out["error"] != "not found" {
 		t.Errorf("unknown API path: %d %v", code, out)
+	}
+	if !ui.Built() {
+		return // CI's Go job doesn't build the web UI; static files come with it
 	}
 	resp, _ := http.Get(ts.URL + "/favicon.svg")
 	resp.Body.Close()

@@ -339,6 +339,14 @@ that is an API server, a web UI and a CLI.
   go-oidc 3.21, x/crypto 0.59, x/net 0.63, docker client 28.5.2, ...).
   govulncheck finds nothing reachable outside the Docker client module,
   whose remaining advisories are daemon-side with no client fix.
+- GitHub Actions: CI (gofmt, vet, tests, govulncheck with an explained
+  ignore list, the web UI check and build, a multi-arch image build) and a
+  tag-triggered release with GPG-signed binaries for Linux, macOS and Windows
+  (amd64, arm64), `SHA256SUMS`, build provenance attestations, and the
+  multi-arch image on Docker Hub signed with cosign (keyless) plus provenance
+  and an SBOM. See `docs/RELEASING.md`.
+- The image is 41 MB instead of 186 MB: a static binary on Debian slim, with
+  no package installs in the final stage.
 - SQLite is now pure Go (`modernc.org/sqlite`) for `file:` databases, and
   remote libsql/Turso URLs use `libsql-client-go`. go-libsql's prebuilt
   libraries contain LTO bitcode, which patched Go releases refuse to link.

@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    name: Go (format, vet, test, vulnerabilities)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # gofmt -l only prints offenders, so turn its output into an exit code.
+      - name: Check formatting
+        run: |
+          out=$(gofmt -l .)
+          if [ -n "$out" ]; then echo "$out"; exit 1; fi
+
+      - run: go vet ./...
+
+      # The web UI isn't built here; internal/ui/dist/.gitkeep keeps the
+      # embed valid and the server answers with a "not built" page.
+      - name: Test
+        run: go test ./...
+
+      # Fails on reachable vulnerabilities not explained in .govulncheck-ignore.
+      - name: govulncheck
+        run: ./scripts/govulncheck.sh
+
+  web:
+    name: Web UI (check, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.3 # the same as the Dockerfile
+      - run: bun install --frozen-lockfile
+      - run: bun run check
+      - run: bun run build
+
+  image:
+    name: Docker image (build only)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

@@ -24,8 +24,10 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath \
       -o /out/locci ./cmd/locci
 
 # --- runtime ---
+# No RUN here: this stage is for the target platform, and anything run in it
+# would need emulation. The CA bundle comes from the build stage.
 FROM debian:bookworm-slim
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY --from=build /out/locci /usr/local/bin/locci
 ENV DATABASE_URL=file:/data/locci.db GIN_MODE=release
 # Only admins may change or open a console in the server and agent containers.
