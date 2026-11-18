@@ -129,6 +129,62 @@ docs/                user and operator docs; docs/oidc/ per identity provider
   asking.
 - Ask before touching uncommitted changes you didn't make.
 
+## Where things go
+
+| Adding | Put it in |
+|---|---|
+| an API route | `internal/server/server.go` (`Router`, or `resourceRoutes` for Docker resources so it exists for the default and every `/environments/:env`); handlers next to their kind (`containers.go`, `environments.go`, ...) |
+| a Docker operation | `internal/docker` (`ops.go`), then a handler that uses `dk(c)` |
+| a table | `schema` in `internal/store/store.go` (`CREATE TABLE IF NOT EXISTS`) |
+| a column on an existing table | `addedColumns` in `internal/store/store.go`, with a follow-up statement for existing rows if they need a value |
+| a timestamp you read from the database | scan it through `stamp{&field}` (`internal/store/stamp.go`), so the API always returns RFC 3339 |
+| a setting | `internal/config/config.go`, wired in `internal/cli/serve.go`, documented in `docs/CONFIGURATION.md` |
+| a CLI command | `internal/cli`, registered in `root.go`; it inherits `-E/--environment` and `-o json` |
+| a page or dialog | `web/src/routes/...` and `web/src/lib/components/`; call the API through `web/src/lib/api.js` (`get`, `post`, `del`, `api`, `stream`), which adds the CSRF header and environment scoping |
+
+## Testing
+
+- Server tests start a real router with `newTestServer(t)`
+  (`internal/server/server_test.go`): a temporary SQLite file, the static
+  token `"static"` as an admin, and a `local` environment pointing at a
+  Docker endpoint that doesn't answer. Use `call(t, method, url, token, body)`
+  for bearer requests and `cookieCall` (`session_test.go`) for the browser's
+  cookie and CSRF header.
+- Docker being down in tests is deliberate: assert on the status codes that
+  come before Docker (400, 403, 404, 409); anything that needs Docker gets a
+  5xx there. Exercise real Docker by running the server.
+- OIDC tests use the fake provider in `internal/sso/ssotest`.
+- The login rate limiter counts per client IP. A test that fails logins
+  many times uses up `127.0.0.1`'s allowance for that test server, so use
+  a fresh server per test, or set `X-Forwarded-For` (loopback is a trusted
+  proxy) to vary the client address.
+- Behind a proxy: a quick bed is NGINX and Traefik containers forwarding to
+  `host.docker.internal:<port>`, and Dex for OIDC (`docs/oidc/DEX.md` has a
+  scripted setup). Remove such containers when done.
+
+## Gotchas
+
+- `go run` (`just dev`) doesn't reload. After Go changes restart it, or the
+  web UI talks to an old server and new routes answer 404.
+- Patched Go releases refuse to link C libraries that carry LTO bitcode;
+  that's why the project dropped go-libsql for pure-Go SQLite. Don't bring
+  cgo back.
+- On Colima, bind mounts from outside `$HOME` show up empty in containers;
+  copy files in with `docker cp` instead. The socket is
+  `unix://$HOME/.colima/default/docker.sock`.
+- With Colima, `docker build` can keep running after it prints
+  `naming to docker.io/... done`. The image is ready at that point; stop the
+  client.
+- `.env` is written for running on the host (`DATABASE_URL=file:locci.db`,
+  a host `DOCKER_HOST`). `compose.yaml` and `just up` override those for the
+  container; keep it that way.
+- The `local` environment is created on first start with an empty URL,
+  which means "`DOCKER_HOST` at startup, else the local socket". Giving it
+  a URL (`locci env edit local --url ...`) makes it ignore `DOCKER_HOST`.
+- The release workflow needs the `DOCKER_USERNAME`, `DOCKER_TOKEN`,
+  `RELEASE_GPG_KEY` and `RELEASE_GPG_PASSPHRASE` secrets
+  ([docs/RELEASING.md](docs/RELEASING.md)).
+
 ## Where to read more
 
 | Topic | Doc |
