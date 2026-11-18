@@ -116,6 +116,12 @@ var schema = []string{
 		created_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		UNIQUE (provider_id, subject)
 	)`,
+	// Agent environments: the token a `locci agent` connects with (hash only).
+	`CREATE TABLE IF NOT EXISTS agent_tokens (
+		environment_id INTEGER PRIMARY KEY REFERENCES environments(id),
+		token_hash     TEXT NOT NULL UNIQUE,
+		created_at     TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+	)`,
 	`CREATE TABLE IF NOT EXISTS settings (
 		key   TEXT PRIMARY KEY,
 		value TEXT NOT NULL

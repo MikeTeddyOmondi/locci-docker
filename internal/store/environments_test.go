@@ -100,3 +100,32 @@ func TestEnvironments(t *testing.T) {
 		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
 }
+
+func TestAgentTokens(t *testing.T) {
+	s := openTest(t)
+	s.EnsureDefaultEnvironment()
+	edge, err := s.CreateEnvironment(Environment{Name: "edge", Kind: KindAgent})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tok, err := s.NewAgentToken(edge.ID)
+	if err != nil || len(tok) < 20 || tok[:3] != "la_" {
+		t.Fatalf("token: %v %q", err, tok)
+	}
+	if e, err := s.EnvironmentByAgentToken(tok); err != nil || e.Name != "edge" {
+		t.Fatalf("lookup: %v %+v", err, e)
+	}
+	// Rotating replaces the old token.
+	tok2, _ := s.NewAgentToken(edge.ID)
+	if _, err := s.EnvironmentByAgentToken(tok); err != ErrNotFound {
+		t.Fatalf("old token should stop working: %v", err)
+	}
+	if _, err := s.EnvironmentByAgentToken(tok2); err != nil {
+		t.Fatal(err)
+	}
+	// Deleting the environment removes its token.
+	s.DeleteEnvironment("edge")
+	if _, err := s.EnvironmentByAgentToken(tok2); err != ErrNotFound {
+		t.Fatalf("token should go with the environment: %v", err)
+	}
+}

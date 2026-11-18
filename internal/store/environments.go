@@ -1,7 +1,9 @@
 package store
 
 import (
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +16,7 @@ const (
 	KindLocal  = "local"   // DOCKER_HOST or the local socket
 	KindTLS    = "tcp+tls" // Docker's TLS port with client certificates
 	KindSSH    = "ssh"     // Docker socket reached over SSH
+	KindAgent  = "agent"   // a `locci agent` on the host dials out to the server
 	StatusUp   = "up"
 	StatusDown = "down"
 )
@@ -51,6 +54,10 @@ func ValidEnvironmentName(name string) bool { return nameRE.MatchString(name) &&
 const envColumns = `id, name, label, kind, url, tls_ca, tls_cert, secret, ssh_host_key,
 	labels, is_default, status, COALESCE(last_seen_at, ''), created_at`
 
+// envColumnsQualified is envColumns for a query that aliases environments as e.
+const envColumnsQualified = `e.id, e.name, e.label, e.kind, e.url, e.tls_ca, e.tls_cert, e.secret,
+	e.ssh_host_key, e.labels, e.is_default, e.status, COALESCE(e.last_seen_at, ''), e.created_at`
+
 func scanEnvironment(row interface{ Scan(...any) error }) (Environment, error) {
 	var e Environment
 	var labels string
@@ -81,8 +88,10 @@ func validateEnvironment(e Environment) error {
 		if !strings.HasPrefix(e.URL, "ssh://") {
 			return errors.New("ssh url must look like ssh://user@host[:port]")
 		}
+	case KindAgent:
+		// The agent connects to us; there is nothing to dial.
 	default:
-		return fmt.Errorf("unknown kind %q (use local, tcp+tls or ssh)", e.Kind)
+		return fmt.Errorf("unknown kind %q (use local, tcp+tls, ssh or agent)", e.Kind)
 	}
 	return nil
 }
@@ -173,8 +182,33 @@ func (s *Store) DeleteEnvironment(name string) error {
 	if e.IsDefault {
 		return errors.New("the default environment can't be removed; make another one the default first")
 	}
+	if _, err := s.DB.Exec(`DELETE FROM agent_tokens WHERE environment_id = ?`, e.ID); err != nil {
+		return err
+	}
 	_, err = s.DB.Exec(`DELETE FROM environments WHERE id = ?`, e.ID)
 	return err
+}
+
+// NewAgentToken creates (or replaces) the token an agent environment's
+// `locci agent` connects with. Only its hash is stored; replacing it locks
+// out an agent using the old token.
+func (s *Store) NewAgentToken(envID int64) (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	token := "la_" + hex.EncodeToString(b)
+	_, err := s.DB.Exec(`INSERT INTO agent_tokens (environment_id, token_hash) VALUES (?, ?)
+		ON CONFLICT(environment_id) DO UPDATE SET token_hash = excluded.token_hash, created_at = CURRENT_TIMESTAMP`,
+		envID, hashToken(token))
+	return token, err
+}
+
+// EnvironmentByAgentToken finds the agent environment a token belongs to.
+func (s *Store) EnvironmentByAgentToken(token string) (Environment, error) {
+	return scanEnvironment(s.DB.QueryRow(`SELECT `+envColumnsQualified+` FROM agent_tokens a
+		JOIN environments e ON e.id = a.environment_id WHERE a.token_hash = ? AND e.kind = ?`,
+		hashToken(token), KindAgent))
 }
 
 // SetDefaultEnvironment moves the default flag to name in one transaction.

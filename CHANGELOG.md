@@ -146,6 +146,9 @@ that is an API server, a web UI and a CLI.
     keeps the stored one, Test connection works without re-entering it, and an
     SSH host's pinned key can be forgotten (it is dropped automatically when
     the URL changes).
+  - Agent environments (in progress): a fourth kind, `agent`, for hosts
+    that dial out to the server. Each has an agent token (`la_...`), stored
+    only as a hash in `agent_tokens`; issuing a new one replaces the old.
 
 - **Single sign-on with OIDC (in progress).**
   - Tables `oidc_providers` (client secret encrypted like environment keys),
