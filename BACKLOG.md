@@ -174,7 +174,7 @@ Libraries: `github.com/coreos/go-oidc/v3` (discovery, ID-token verification) and
 - [x] start/callback handlers with state, nonce, PKCE, signed cookie
 - [x] user matching/creation, domain allow-list, group → role mapping
 - [x] UI: provider buttons on the login page; token pickup from the URL fragment
-- [ ] UI: admin providers page
+- [x] UI: admin providers page
 - [x] setting to disable password login
 - [x] CLI: `login --sso` (loopback); break-glass `locci auth password-login on`
 - [ ] later: CLI `login --device` (device authorization flow)

@@ -187,6 +187,12 @@ that is an API server, a web UI and a CLI.
     password form only while password login is on, and pickup of the token
     (or error) from the URL fragment, which is then cleared. Users signed up
     through SSO carry an "SSO" badge on the Users page.
+  - Sign-in page (admin, under Harbour master): the password-login switch
+    (disabled until a provider is enabled), a card per provider with an
+    enable switch, its rules and the redirect URI to copy, and an add/edit
+    dialog with **Discover** to check the issuer before saving. A blank
+    secret on edit keeps the stored one. Tested end to end against Dex in
+    the browser and with `locci login --sso`.
 
 ### Changed
 

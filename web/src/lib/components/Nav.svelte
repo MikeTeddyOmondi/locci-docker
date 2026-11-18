@@ -15,6 +15,7 @@
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
 	import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
 	import ServerIcon from '@lucide/svelte/icons/server';
+	import KeyRoundIcon from '@lucide/svelte/icons/key-round';
 	import EnvSwitcher from '$lib/components/EnvSwitcher.svelte';
 	import { session } from '$lib/session.svelte.js';
 	import { href as envHref } from '$lib/env.svelte.js';
@@ -41,6 +42,7 @@
 						label: 'Harbour master',
 						items: [
 							['/users', 'Users', UsersIcon],
+							['/sign-in', 'Sign-in', KeyRoundIcon],
 							['/audit', 'Audit log', ScrollTextIcon]
 						]
 					}
