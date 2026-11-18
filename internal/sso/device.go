@@ -44,6 +44,7 @@ type DeviceCode struct {
 type deviceHandle struct {
 	Slug       string `json:"p"`
 	DeviceCode string `json:"d"`
+	Verifier   string `json:"v"` // PKCE verifier for the token request
 	Expires    int64  `json:"e"`
 }
 
@@ -60,8 +61,16 @@ func (s *Service) DeviceStart(ctx context.Context, p store.Provider) (DeviceCode
 		return DeviceCode{}, ErrNoDeviceFlow
 	}
 	// Not oauth2's DeviceAuth: it sends no client secret, which confidential
-	// clients (Keycloak, Authentik) need at this endpoint.
-	form := url.Values{"client_id": {cfg.ClientID}, "scope": {strings.Join(cfg.Scopes, " ")}}
+	// clients (Keycloak, Authentik) need at this endpoint. PKCE is sent too:
+	// Keycloak requires it here when the client enforces it, and providers
+	// that don't use it for this flow ignore it.
+	verifier := oauth2.GenerateVerifier()
+	form := url.Values{
+		"client_id":             {cfg.ClientID},
+		"scope":                 {strings.Join(cfg.Scopes, " ")},
+		"code_challenge":        {oauth2.S256ChallengeFromVerifier(verifier)},
+		"code_challenge_method": {"S256"},
+	}
 	var da struct {
 		DeviceCode              string `json:"device_code"`
 		UserCode                string `json:"user_code"`
@@ -94,7 +103,7 @@ func (s *Service) DeviceStart(ctx context.Context, p store.Provider) (DeviceCode
 	if da.ExpiresIn > 0 {
 		expires = time.Now().Add(time.Duration(da.ExpiresIn) * time.Second)
 	}
-	raw, _ := json.Marshal(deviceHandle{Slug: p.Slug, DeviceCode: da.DeviceCode, Expires: expires.Unix()})
+	raw, _ := json.Marshal(deviceHandle{Slug: p.Slug, DeviceCode: da.DeviceCode, Verifier: verifier, Expires: expires.Unix()})
 	handle, err := s.Box.Seal(string(raw))
 	if err != nil {
 		return DeviceCode{}, err
@@ -129,7 +138,7 @@ func (s *Service) DevicePoll(ctx context.Context, p store.Provider, handle strin
 		return Claims{}, err
 	}
 	octx := s.ctx(ctx)
-	tok, rawID, err := s.deviceToken(octx, cfg, h.DeviceCode)
+	tok, rawID, err := s.deviceToken(octx, cfg, h.DeviceCode, h.Verifier)
 	if err != nil {
 		return Claims{}, err
 	}
@@ -168,11 +177,14 @@ func (s *Service) postForm(octx context.Context, cfg *oauth2.Config, endpoint st
 // deviceToken makes one token request. oauth2's DeviceAccessToken polls in a
 // loop until done, which doesn't fit a request/response API, so this is the
 // single-shot version of it.
-func (s *Service) deviceToken(octx context.Context, cfg *oauth2.Config, deviceCode string) (*oauth2.Token, string, error) {
+func (s *Service) deviceToken(octx context.Context, cfg *oauth2.Config, deviceCode, verifier string) (*oauth2.Token, string, error) {
 	form := url.Values{
 		"grant_type":  {"urn:ietf:params:oauth:grant-type:device_code"},
 		"device_code": {deviceCode},
 		"client_id":   {cfg.ClientID},
+	}
+	if verifier != "" {
+		form.Set("code_verifier", verifier)
 	}
 	var out struct {
 		AccessToken string `json:"access_token"`

@@ -43,6 +43,7 @@ type Provider struct {
 type device struct {
 	approved, denied bool
 	claims           map[string]any
+	challenge        string // PKCE, when the client sent one
 }
 
 type grant struct {
@@ -198,7 +199,7 @@ func (p *Provider) deviceAuth(w http.ResponseWriter, r *http.Request) {
 	}
 	code := random()
 	p.mu.Lock()
-	p.devices[code] = &device{}
+	p.devices[code] = &device{challenge: r.PostForm.Get("code_challenge")}
 	p.lastDev = code
 	p.mu.Unlock()
 	writeJSON(w, map[string]any{
@@ -217,8 +218,11 @@ func (p *Provider) deviceGrant(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]string{"error": e})
 	}
+	sum := sha256.Sum256([]byte(r.PostForm.Get("code_verifier")))
 	switch {
 	case d == nil:
+		fail("invalid_grant")
+	case d.challenge != "" && base64.RawURLEncoding.EncodeToString(sum[:]) != d.challenge:
 		fail("invalid_grant")
 	case d.denied:
 		fail("access_denied")

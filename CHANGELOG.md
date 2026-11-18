@@ -193,6 +193,9 @@ that is an API server, a web UI and a CLI.
     provider. Users are matched exactly as in the browser flow, and sign-ins
     are audited as `LOGIN`. Providers without a
     `device_authorization_endpoint` get a clear error.
+    The device request carries PKCE (S256) and the poll its verifier, kept
+    in the sealed handle: Keycloak requires it when the client enforces PKCE.
+    Tested end to end against Keycloak with `locci login --device`.
   - CLI: `locci login --sso <provider> --device` prints the verification URL
     and code (and the one-click URL when the provider gives one), then polls
     at the provider's interval, backing off on `slow_down`, until approval,
