@@ -169,6 +169,13 @@ that is an API server, a web UI and a CLI.
     with backoff and stops for good when its token is refused.
     `locci env add NAME --kind agent` prints the token and the commands to
     start the agent; `locci env edit NAME --rotate-agent-token` replaces it.
+    UI: an "Agent (outbound)" kind in the Add dialog (no address or keys),
+    a one-time dialog with the token and the commands to start the agent
+    (binary and `docker run`), cards that say whether the agent is
+    connected, and a "Rotate agent token" action. Tested end to end with
+    `locci agent` on a separate machine process against the local Docker:
+    containers, logs, stats, the browser console and exec all work through
+    the tunnel, and a rotated token disconnects the agent, which then stops.
 
 - **Single sign-on with OIDC (in progress).**
   - Tables `oidc_providers` (client secret encrypted like environment keys),

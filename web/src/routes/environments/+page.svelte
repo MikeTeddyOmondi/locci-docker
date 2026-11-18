@@ -9,6 +9,8 @@
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import { Switch } from '$lib/components/ui/switch/index.js';
+	import * as Dialog from '$lib/components/ui/dialog/index.js';
+	import CopyId from '$lib/components/CopyId.svelte';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import ServerIcon from '@lucide/svelte/icons/server';
 	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
@@ -56,7 +58,27 @@
 		refresh();
 	});
 
-	const where = (e) => (e.url ? e.url : 'DOCKER_HOST or local socket');
+	const where = (e) =>
+		e.kind === 'agent'
+			? e.agent_connected
+				? 'outbound agent, connected'
+				: 'outbound agent, waiting for it to connect'
+			: e.url || 'DOCKER_HOST or local socket';
+
+	// A freshly issued agent token, shown once with the commands to start the agent.
+	let issued = $state(null); // { name, token }
+
+	async function rotate(e) {
+		const ok = await confirm({
+			title: `New agent token for ${e.label}?`,
+			description: 'The agent using the current token is disconnected and must be restarted with the new one.',
+			action: 'Rotate token'
+		});
+		if (!ok) return;
+		const r = await attempt(() => patch(`/environments/${encodeURIComponent(e.name)}`, { rotate_agent_token: true }), 'New agent token issued');
+		if (r?.agent_token) issued = { name: r.name, token: r.agent_token };
+		refresh();
+	}
 
 	async function setDefault(e) {
 		if (await attempt(() => post(`/environments/${encodeURIComponent(e.name)}/default`), `${e.label} is now the default`))
@@ -78,7 +100,8 @@
 	const kinds = [
 		['ssh', 'SSH', 'Reach the Docker socket over SSH; no Docker port exposed'],
 		['tcp+tls', 'TCP + TLS', "Docker's TLS port (2376) with client certificates"],
-		['local', 'Local socket', 'A socket or URL reachable from this server']
+		['local', 'Local socket', 'A socket or URL reachable from this server'],
+		['agent', 'Agent (outbound)', 'The host runs locci agent and dials out; works behind NAT, no open ports']
 	];
 	const blank = () => ({
 		name: '', label: '', kind: 'ssh', url: '', tls_ca: '', tls_cert: '', tls_key: '', ssh_key: '', reset_host_key: false
@@ -142,9 +165,12 @@
 		const saved = editing
 			? await attempt(() => patch(`/environments/${encodeURIComponent(editing.name)}`, b), `Saved ${label}`)
 			: await attempt(() => post('/environments', b), `Added ${label}`);
+		if (saved?.agent_token) issued = { name: saved.name, token: saved.agent_token };
 		if (saved) refresh();
 		return saved;
 	}
+
+	const server = typeof location === 'undefined' ? '' : location.origin;
 
 	async function loadFile(field, e) {
 		const file = e.currentTarget.files?.[0];
@@ -192,6 +218,9 @@
 								<DropdownMenu.Content align="end" class="w-48">
 									<DropdownMenu.Item onclick={() => goto(`/e/${encodeURIComponent(e.name)}`)}><ServerIcon /> Open</DropdownMenu.Item>
 									<DropdownMenu.Item onclick={() => openEdit(e)}><PencilIcon /> Edit</DropdownMenu.Item>
+									{#if e.kind === 'agent'}
+										<DropdownMenu.Item onclick={() => rotate(e)}><KeyRoundIcon /> Rotate agent token</DropdownMenu.Item>
+									{/if}
 									{#if !e.is_default}
 										<DropdownMenu.Item onclick={() => setDefault(e)}><StarIcon /> Set as default</DropdownMenu.Item>
 									{/if}
@@ -294,6 +323,12 @@
 		</Select.Root>
 	</div>
 
+	{#if f.kind === 'agent'}
+		<p class="rounded-lg border bg-muted/40 p-3 text-xs text-muted-foreground">
+			No address needed: after saving you get a token, and the host connects with
+			<code>locci agent</code>. It only needs to reach this server over HTTPS.
+		</p>
+	{:else}
 	<div class="grid content-start gap-2">
 		<Label for="env-url">URL</Label>
 		<Input id="env-url" bind:value={f.url} required={f.kind !== 'local'} placeholder={placeholder} class="font-mono" />
@@ -304,6 +339,7 @@
 			</p>
 		{/if}
 	</div>
+	{/if}
 
 	{#if f.kind === 'ssh' && editing?.ssh_fingerprint}
 		<div class="flex items-start justify-between gap-3 rounded-lg border p-3">
@@ -349,8 +385,44 @@
 	{/if}
 
 	{#snippet extra()}
-		<Button type="button" variant="outline" onclick={runTest} disabled={testing || (f.kind !== 'local' && !f.url)}>
+		<Button type="button" variant="outline" onclick={runTest} disabled={testing || f.kind === 'agent' || (f.kind !== 'local' && !f.url)}>
 			{#if testing}<Loader2Icon class="animate-spin" /> Testing{:else}<PlugIcon /> Test connection{/if}
 		</Button>
 	{/snippet}
 </FormDialog>
+
+<Dialog.Root open={!!issued} onOpenChange={(o) => !o && (issued = null)}>
+	<Dialog.Content class="max-h-[90dvh] overflow-y-auto sm:max-w-xl">
+		<div class="ribbed absolute inset-x-0 top-0 h-1.5 text-primary" aria-hidden="true"></div>
+		<Dialog.Header>
+			<div class="kicker">Shown once</div>
+			<Dialog.Title class="font-heading text-xl">Start the agent for {issued?.name}</Dialog.Title>
+			<Dialog.Description>
+				Copy the token now: locci keeps only its hash. Run one of these on the Docker host; it connects out to this
+				server and shows up as connected within a few seconds.
+			</Dialog.Description>
+		</Dialog.Header>
+		{#if issued}
+			<div class="grid gap-3 text-xs">
+				<div class="grid gap-1.5">
+					<span class="kicker text-[0.6rem]">Agent token</span>
+					<CopyId value={issued.token} label={issued.token} class="max-w-full rounded-md border px-2 py-1.5" />
+				</div>
+				<div class="grid gap-1.5">
+					<span class="kicker text-[0.6rem]">With the locci binary</span>
+					<pre class="overflow-x-auto rounded-md bg-muted p-3 whitespace-pre-wrap break-all">LOCCI_AGENT_TOKEN={issued.token} locci agent --server {server}</pre>
+				</div>
+				<div class="grid gap-1.5">
+					<span class="kicker text-[0.6rem]">In Docker</span>
+					<pre class="overflow-x-auto rounded-md bg-muted p-3 whitespace-pre-wrap break-all">docker run -d --name locci-agent --restart unless-stopped \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -e LOCCI_AGENT_TOKEN={issued.token} \
+  &lt;locci image&gt; agent --server {server}</pre>
+				</div>
+			</div>
+		{/if}
+		<Dialog.Footer>
+			<Button onclick={() => (issued = null)}>Done</Button>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
