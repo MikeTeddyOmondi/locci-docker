@@ -191,3 +191,25 @@ func TestGroupsFromUserinfo(t *testing.T) {
 		t.Fatalf("expected admin from userinfo groups, got %+v", u)
 	}
 }
+
+func TestClaimsShapes(t *testing.T) {
+	// Zitadel: roles as an object keyed by role name.
+	c := claimsFrom(map[string]any{"urn:zitadel:iam:org:project:roles": map[string]any{
+		"locci-admins": map[string]any{"123": "org.example.com"}, "dev": map[string]any{},
+	}}, "urn:zitadel:iam:org:project:roles")
+	if len(c.Groups) != 2 || c.Groups[0] != "dev" || c.Groups[1] != "locci-admins" {
+		t.Fatalf("object groups: %v", c.Groups)
+	}
+	if role(store.Provider{AdminGroup: "locci-admins", DefaultRole: "user"}, c) != "admin" {
+		t.Fatal("expected a role key to grant admin")
+	}
+	// A string email_verified and a single-string group.
+	c = claimsFrom(map[string]any{"email_verified": "true", "groups": "ops"}, "groups")
+	if !c.EmailVerified || len(c.Groups) != 1 {
+		t.Fatalf("string shapes: %+v", c)
+	}
+	// No email_verified claim (Entra ID) means unverified.
+	if claimsFrom(map[string]any{"email": "a@b.c"}, "groups").EmailVerified {
+		t.Fatal("a missing email_verified must count as unverified")
+	}
+}

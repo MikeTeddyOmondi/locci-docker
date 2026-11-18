@@ -235,7 +235,8 @@ func (s *Service) verifiedClaims(octx context.Context, p store.Provider, op *oid
 }
 
 // claimsFrom reads claims leniently: email_verified may be a bool or a
-// string, and groups a list or a single string.
+// string, and groups a list, a single string, or an object whose keys are the
+// group or role names (Zitadel's urn:zitadel:iam:org:project:roles).
 func claimsFrom(m map[string]any, groupsClaim string) Claims {
 	str := func(k string) string { v, _ := m[k].(string); return v }
 	c := Claims{
@@ -257,6 +258,11 @@ func claimsFrom(m map[string]any, groupsClaim string) Claims {
 		}
 	case string:
 		c.Groups = []string{v}
+	case map[string]any:
+		for name := range v {
+			c.Groups = append(c.Groups, name)
+		}
+		slices.Sort(c.Groups)
 	}
 	return c
 }

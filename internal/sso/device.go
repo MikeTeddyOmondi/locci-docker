@@ -202,7 +202,7 @@ func (s *Service) deviceToken(octx context.Context, cfg *oauth2.Config, deviceCo
 		return nil, "", ErrPending
 	case "slow_down":
 		return nil, "", ErrSlowDown
-	case "access_denied":
+	case "access_denied", "authorization_declined": // the latter is Entra ID's
 		return nil, "", errors.New("the sign-in was denied")
 	case "expired_token":
 		return nil, "", errors.New("the code expired; start again")

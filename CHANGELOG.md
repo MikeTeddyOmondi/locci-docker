@@ -196,6 +196,10 @@ that is an API server, a web UI and a CLI.
     The device request carries PKCE (S256) and the poll its verifier, kept
     in the sealed handle: Keycloak requires it when the client enforces PKCE.
     Tested end to end against Keycloak with `locci login --device`.
+  - A groups claim shaped as an object counts its keys as the group names,
+    so Zitadel's `urn:zitadel:iam:org:project:roles` works as the groups
+    claim; Entra ID's `authorization_declined` counts as a denied device
+    sign-in.
   - CLI: `locci login --sso <provider> --device` prints the verification URL
     and code (and the one-click URL when the provider gives one), then polls
     at the provider's interval, backing off on `slow_down`, until approval,
