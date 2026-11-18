@@ -1,11 +1,14 @@
 # Changelog
 
 All notable changes to this project. The format follows
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/). There are no tagged
-releases yet, so older entries are grouped by date. Planned work lives in
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow
+[Semantic Versioning](https://semver.org/). Entries before 0.1.0, from before
+the project had tagged releases, are grouped by date. Planned work lives in
 `BACKLOG.md`.
 
 ## [Unreleased]
+
+## [0.1.0] - 2026-11-19
 
 The project grows from a single-file Docker API wrapper into one `locci` binary
 that is an API server, a web UI and a CLI.
@@ -27,8 +30,8 @@ that is an API server, a web UI and a CLI.
 - **Single binary with a Cobra CLI.** `locci serve` runs the API (and the
   RabbitMQ deploy consumer when `RABBITMQ_URL` is set); `locci user` manages
   users on the server host.
-- **libsql storage** (`internal/store`, `github.com/tursodatabase/go-libsql`).
-  `DATABASE_URL` is a local file (`file:locci.db`) or a remote libsql/Turso
+- **SQLite / libsql storage** (`internal/store`: pure-Go `modernc.org/sqlite`
+  for files, `libsql-client-go` for Turso). `DATABASE_URL` is a local file (`file:locci.db`) or a remote libsql/Turso
   database. Holds:
   - users with bcrypt passwords and an `admin`/`user` role
   - API tokens (random `lc_` tokens; only their SHA-256 hash is stored)
@@ -61,8 +64,9 @@ that is an API server, a web UI and a CLI.
   copyable IDs and confirmation prompts.
 - **Modal forms** for pulling images and creating networks, volumes and users.
 - **Three-container logo** used in the UI and as the favicon.
-- **Build and tooling.** Multi-stage `Dockerfile` (web build → Go build with
-  cgo → Debian slim runtime with the database on a `/data` volume);
+- **Build and tooling.** Multi-stage `Dockerfile` (web build, then a static
+  Go build cross-compiled per platform, then a Debian slim runtime with the database
+  on a `/data` volume);
   `.dockerignore`; `.env.sample` with `DATABASE_URL`; README with quick start,
   layout and the API route list.
 - **compose.yaml** and `just compose-up` / `compose-down` / `compose-logs`:
@@ -412,10 +416,6 @@ that is an API server, a web UI and a CLI.
 - A container's subdomain must be one DNS label (lowercase letters, digits,
   dashes): it is part of Traefik's label keys, where a dot or backtick could
   change other routes.
-
-### Notes
-
-- go-libsql needs cgo: build with `CGO_ENABLED=1` on glibc.
 
 ## 2025-10-07: Pull images before creating containers
 
