@@ -183,6 +183,16 @@ that is an API server, a web UI and a CLI.
     browser (printing the URL too) and saves the token the server sends back.
     `locci auth password-login on|off` writes the setting straight to the
     database on the server host, as break-glass access when SSO is broken.
+  - Device flow (RFC 8628) for machines without a browser:
+    `POST /auth/oidc/:provider/device` returns the user code and verification
+    URL; `POST .../device/token` with the returned handle answers `pending`,
+    `slow_down` or a token. The server talks to the provider (it holds the
+    client secret, sent as `client_secret_basic` on both requests); the CLI
+    only gets the user code and a handle sealed with `LOCCI_SECRET_KEY`, so
+    the device code never leaves the server and can't be used with another
+    provider. Users are matched exactly as in the browser flow, and sign-ins
+    are audited as `LOGIN`. Providers without a
+    `device_authorization_endpoint` get a clear error.
   - Login page: a "Continue with ..." button per enabled provider, the
     password form only while password login is on, and pickup of the token
     (or error) from the URL fragment, which is then cleared. Users signed up

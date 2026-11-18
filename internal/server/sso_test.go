@@ -157,3 +157,44 @@ func TestSSONeedsSecretKey(t *testing.T) {
 		t.Fatalf("expected 409, got %d", code)
 	}
 }
+
+func TestSSODeviceFlow(t *testing.T) {
+	ts, _ := newTestServerWithKey(t, testBox(t))
+	api := ts.URL + "/api/v1"
+	idp := ssotest.New(t)
+
+	// Disabled or unknown providers don't offer it.
+	if code, _ := call(t, "POST", api+"/auth/oidc/fake/device", "", nil); code != 404 {
+		t.Fatalf("device before setup: got %d", code)
+	}
+	call(t, "POST", api+"/sso/providers", "static", map[string]any{"slug": "fake", "issuer_url": idp.URL,
+		"client_id": idp.ClientID, "client_secret": idp.ClientSecret, "auto_create_users": true, "enabled": true})
+
+	code, out := call(t, "POST", api+"/auth/oidc/fake/device", "", nil)
+	if code != 200 || out["user_code"] != "ABCD-EFGH" || out["handle"] == "" || out["device_code"] != nil {
+		t.Fatalf("device start: %d %v", code, out)
+	}
+	handle := out["handle"].(string)
+
+	if code, out := call(t, "POST", api+"/auth/oidc/fake/device/token", "", map[string]string{"handle": handle}); code != 200 || out["status"] != "pending" {
+		t.Fatalf("pending: %d %v", code, out)
+	}
+	idp.SetUser(map[string]any{"sub": "d-9", "email": "ops@example.com", "email_verified": true})
+	idp.ApproveDevice()
+	code, out = call(t, "POST", api+"/auth/oidc/fake/device/token", "", map[string]string{"handle": handle})
+	if code != 200 || out["status"] != "ok" || out["token"] == "" {
+		t.Fatalf("approved: %d %v", code, out)
+	}
+	if code, me := call(t, "GET", api+"/auth/me", out["token"].(string), nil); code != 200 || me["username"] != "ops@example.com" {
+		t.Fatalf("me: %d %v", code, me)
+	}
+	_, audit := call(t, "GET", api+"/audit", "static", nil)
+	if a := audit["audit"].([]any)[0].(map[string]any); a["method"] != "LOGIN" || a["username"] != "ops@example.com" {
+		t.Fatalf("audit: %v", a)
+	}
+
+	// A garbage handle is refused.
+	if code, _ := call(t, "POST", api+"/auth/oidc/fake/device/token", "", map[string]string{"handle": "nope"}); code != 400 {
+		t.Fatalf("bad handle: got %d", code)
+	}
+}

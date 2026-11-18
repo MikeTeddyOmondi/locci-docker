@@ -192,6 +192,68 @@ func (s *Server) ssoCallback(c *gin.Context) {
 	s.ssoDone(c, flow.CLIPort, token, nil)
 }
 
+// ssoDeviceStart begins the device flow for machines without a browser.
+//
+//	POST /api/v1/auth/oidc/:provider/device
+func (s *Server) ssoDeviceStart(c *gin.Context) {
+	p, ok := s.ssoProvider(c)
+	if !ok {
+		return
+	}
+	dc, err := s.SSO.DeviceStart(c.Request.Context(), p)
+	if err != nil {
+		s.fail(c, http.StatusBadRequest, err)
+		return
+	}
+	c.JSON(http.StatusOK, dc)
+}
+
+// ssoDevicePoll asks the provider once whether the code was approved.
+//
+//	POST /api/v1/auth/oidc/:provider/device/token {"handle": "..."}
+//
+// 200 {"status":"pending"} or {"status":"slow_down"} while waiting,
+// {"status":"ok","token":...} once signed in, 400 with an error otherwise.
+func (s *Server) ssoDevicePoll(c *gin.Context) {
+	p, ok := s.ssoProvider(c)
+	if !ok {
+		return
+	}
+	var req struct {
+		Handle string `json:"handle" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		s.fail(c, http.StatusBadRequest, err)
+		return
+	}
+	claims, err := s.SSO.DevicePoll(c.Request.Context(), p, req.Handle)
+	switch {
+	case errors.Is(err, sso.ErrPending):
+		c.JSON(http.StatusOK, gin.H{"status": "pending"})
+		return
+	case errors.Is(err, sso.ErrSlowDown):
+		c.JSON(http.StatusOK, gin.H{"status": "slow_down"})
+		return
+	}
+	who := "sso:" + p.Slug
+	if err == nil {
+		if claims.Email != "" {
+			who += ":" + claims.Email
+		}
+		var user store.User
+		if user, err = s.SSO.Resolve(p, claims); err == nil {
+			var token string
+			if token, err = s.Store.NewToken(user.ID, "sso-device:"+p.Slug); err == nil {
+				_ = s.Store.Audit(user.Username, "LOGIN", c.Request.URL.Path, http.StatusOK)
+				c.JSON(http.StatusOK, gin.H{"status": "ok", "token": token, "user": user})
+				return
+			}
+		}
+	}
+	_ = s.Store.Audit(who, "LOGIN", c.Request.URL.Path, http.StatusUnauthorized)
+	s.fail(c, http.StatusBadRequest, err)
+}
+
 // ---- admin: providers and settings ----
 
 // providerView adds what the admin needs and hides the client secret.

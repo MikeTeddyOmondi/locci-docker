@@ -40,6 +40,8 @@ func (s *Server) Router(mode string) *gin.Engine {
 	r.GET("/api/v1/auth/providers", s.authProviders)
 	r.GET("/api/v1/auth/oidc/:provider/start", s.ssoStart)
 	r.GET("/api/v1/auth/oidc/:provider/callback", s.ssoCallback)
+	r.POST("/api/v1/auth/oidc/:provider/device", s.ssoDeviceStart)
+	r.POST("/api/v1/auth/oidc/:provider/device/token", s.ssoDevicePoll)
 
 	api := r.Group("/api/v1", s.auth, s.audit)
 
