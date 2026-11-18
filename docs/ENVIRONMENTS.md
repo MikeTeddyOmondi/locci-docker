@@ -46,6 +46,9 @@ Names are lowercase letters, digits and dashes, are used in URLs
 
 ## Agent hosts (outbound, behind NAT)
 
+[AGENTS.md](AGENTS.md) has the full picture: how the tunnel works, running
+the agent with Docker, Compose or systemd, tokens and troubleshooting.
+
 With the `agent` kind the Docker host connects to locci, not the other way
 round, so it needs no open port, public address or VPN: only outbound HTTPS
 to the locci server.

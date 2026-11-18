@@ -4,6 +4,7 @@
 |---|---|
 | [USAGE.md](USAGE.md) | Using the web UI: dashboard, containers, images, networks, volumes, users, audit log |
 | [ENVIRONMENTS.md](ENVIRONMENTS.md) | Managing several Docker hosts over TLS or SSH, and preparing those hosts |
+| [AGENTS.md](AGENTS.md) | Outbound agents for hosts behind NAT: how they work, running one, tokens, troubleshooting |
 | [CLI.md](CLI.md) | The `locci` command line: login, choosing a host, every command |
 | [API.md](API.md) | The HTTP API: authentication, every route, payloads, backward compatibility |
 | [DOCKER.md](DOCKER.md) | Running locci itself in Docker, and building the image |

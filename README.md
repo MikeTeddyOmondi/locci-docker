@@ -70,6 +70,7 @@ locci ps -E edge
 |---|---|
 | [Usage](docs/USAGE.md) | the web UI, page by page |
 | [Environments](docs/ENVIRONMENTS.md) | adding and preparing remote Docker hosts |
+| [Agents](docs/AGENTS.md) | outbound agents for hosts behind NAT |
 | [CLI](docs/CLI.md) | every command |
 | [API](docs/API.md) | every route and payload |
 | [Docker](docs/DOCKER.md) | running locci in a container |

@@ -271,6 +271,9 @@ that is an API server, a web UI and a CLI.
   30 seconds so proxies don't close it; log streams send
   `X-Accel-Buffering: no`; `100.64.0.0/10` (NetBird, Tailscale) is trusted
   by default. New guide: `docs/REVERSE_PROXY.md`.
+- `docs/AGENTS.md`: how outbound agents work (the tunnel, reconnects,
+  tokens), running one with Docker, Compose or systemd, options, security
+  and troubleshooting.
 - `AGENTS.md`: how the code is laid out, the commands, what to check before a
   change is done, and the project's rules, for coding agents and people.
 - Per-environment access: an admin can limit an environment to chosen users
