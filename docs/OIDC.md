@@ -5,8 +5,8 @@ locci can sign people in through any OpenID Connect provider with discovery
 PKCE; after the provider confirms the user, locci issues its normal `lc_`
 token, so the API, CLI and audit log work exactly as with passwords.
 
-Step-by-step guides, each with a manual and a scripted setup, tested against
-the real provider:
+Self-hosted providers, each guide with a manual and a scripted setup, tested
+end to end against the real provider:
 
 | Provider | Guide | Device flow (`--device`) |
 |---|---|---|
@@ -15,9 +15,19 @@ the real provider:
 | Pocket ID | [oidc/POCKETID.md](oidc/POCKETID.md) | check your version's discovery document |
 | Dex | [oidc/DEX.md](oidc/DEX.md) | yes, register its `/device/callback` redirect |
 
-Others with discovery (Zitadel, Authelia, Kanidm, Ory, Google, Microsoft Entra
-ID, GitLab, Okta, Auth0) use the same settings: an issuer URL, a client ID and
-secret, and the redirect URI. GitHub is OAuth2 only; put it behind Dex.
+Hosted and cloud providers (written from their documentation, not tested end
+to end):
+
+| Provider | Guide | Device flow (`--device`) |
+|---|---|---|
+| Google | [oidc/GOOGLE.md](oidc/GOOGLE.md) | a second client of type "TVs and Limited Input" |
+| Microsoft Entra ID | [oidc/ENTRA.md](oidc/ENTRA.md) | a second, public app registration |
+| Zitadel | [oidc/ZITADEL.md](oidc/ZITADEL.md) | enable the Device Code grant on the app |
+| GitLab | [oidc/GITLAB.md](oidc/GITLAB.md) | if discovery lists a device endpoint |
+
+Others with discovery (Authelia, Kanidm, Ory, Okta, Auth0) use the same
+settings: an issuer URL, a client ID and secret, and the redirect URI. GitHub
+is OAuth2 only; put it behind Dex.
 
 ## What stays the default
 

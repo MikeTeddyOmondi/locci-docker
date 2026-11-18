@@ -221,6 +221,10 @@ that is an API server, a web UI and a CLI.
     Authentik (needs `authorization_code` in the provider's grant types and a
     verified-email mapping for domain lists), Pocket ID (needs the `groups`
     scope; emails arrive unverified) and Dex (web and `locci login --sso`).
+  - Guides for hosted providers in `docs/oidc/`: Google, Microsoft Entra
+    ID, Zitadel and GitLab, with scripted setups where the provider has a
+    CLI or API for it (Entra via `az`, GitLab via its API). They follow each
+    provider's documentation and say so; they weren't tested end to end.
 
 ### Changed
 

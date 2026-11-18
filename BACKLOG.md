@@ -180,7 +180,7 @@ Libraries: `github.com/coreos/go-oidc/v3` (discovery, ID-token verification) and
 - [x] CLI: `login --sso <provider> --device` (device authorization flow)
 - [x] tests with a fake OIDC provider (`httptest` issuer + signed tokens)
 - [x] docs: setup guides (manual and scripted) for Keycloak, Authentik, Pocket ID and Dex, each tested end to end
-- [ ] later: guides for hosted providers (Google, Entra ID) and Zitadel
+- [x] guides for hosted providers: Google, Entra ID, Zitadel, GitLab (from their docs; not tested end to end)
 
 **Done when:** a user can sign in with Keycloak (or any OIDC provider) from the
 web UI and the CLI, gets the right role from their groups, and every login
