@@ -19,8 +19,8 @@ Set these in the repository's settings (Secrets and variables, Actions):
 
 | Secret | What |
 |---|---|
-| `DOCKERHUB_USERNAME` | Docker Hub user that can push `locci/docker` |
-| `DOCKERHUB_TOKEN` | a Docker Hub access token for it (Read & Write) |
+| `DOCKER_USERNAME` | Docker Hub user that can push `locci/docker` |
+| `DOCKER_TOKEN` | a Docker Hub access token for it (Read & Write) |
 | `RELEASE_GPG_KEY` | the ASCII-armoured private key that signs the binaries (`gpg --armor --export-secret-keys KEYID`) |
 | `RELEASE_GPG_PASSPHRASE` | its passphrase |
 
