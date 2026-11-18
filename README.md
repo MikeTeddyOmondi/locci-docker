@@ -23,7 +23,31 @@ just all                              # build the UI, then the binary
 ./locci serve                         # http://localhost:8998
 ```
 
-Or in Docker: `just image && just up` (see [docs/DOCKER.md](docs/DOCKER.md)).
+Or in Docker: `just image && just up`, or `just compose-up` with the
+repository's [`compose.yaml`](compose.yaml) (see [docs/DOCKER.md](docs/DOCKER.md)).
+
+### Compose
+
+```yaml
+services:
+  locci:
+    image: locci/docker:latest   # from `just image tag=latest`
+    restart: unless-stopped
+    ports: ["8998:8998"]
+    env_file: .env
+    environment:
+      LOCCI_SECRET_KEY: ${LOCCI_SECRET_KEY}
+      DATABASE_URL: file:/data/locci.db         # keep the database on the volume
+      DOCKER_HOST: unix:///var/run/docker.sock  # the socket mounted below
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - locci-data:/data
+volumes:
+  locci-data:
+```
+
+Then `docker exec -it <container> locci user add admin --admin` and open
+http://localhost:8998.
 
 From another terminal or machine:
 
