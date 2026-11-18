@@ -76,8 +76,8 @@ Then verify a download:
 gpg --verify SHA256SUMS.asc SHA256SUMS          # the checksums are ours
 sha256sum -c SHA256SUMS --ignore-missing        # and match your download
 # or one archive directly:
-gpg --verify locci-v0.2.0-linux-amd64.tar.gz.asc locci-v0.2.0-linux-amd64.tar.gz
-gh attestation verify locci-v0.2.0-linux-amd64.tar.gz --repo MikeTeddyOmondi/locci-docker
+gpg --verify locci-docker-v0.2.0-linux-amd64.tar.gz.asc locci-docker-v0.2.0-linux-amd64.tar.gz
+gh attestation verify locci-docker-v0.2.0-linux-amd64.tar.gz --repo MikeTeddyOmondi/locci-docker
 ```
 
 gpg reports "Good signature" and, until you certify the key yourself, a

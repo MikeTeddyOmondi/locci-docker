@@ -272,8 +272,10 @@ that is an API server, a web UI and a CLI.
     provider's documentation and say so; they weren't tested end to end.
 - GitHub Actions: CI (gofmt, vet, tests, govulncheck with an explained
   ignore list, the web UI check and build, a multi-arch image build) and a
-  tag-triggered release with GPG-signed binaries for Linux, macOS and Windows
-  (amd64, arm64), `SHA256SUMS`, build provenance attestations, and the
+  tag-triggered release, titled "Locci Docker <version>", with GPG-signed
+  archives for Linux, macOS and Windows (amd64, arm64) named
+  `locci-docker-<version>-<os>-<arch>` (the `locci` executable, README and
+  both licenses), `SHA256SUMS`, build provenance attestations, and the
   multi-arch image on Docker Hub signed with cosign (keyless) plus provenance
   and an SBOM. See `docs/RELEASING.md`.
 - Works behind reverse proxies and tunnels: `LOCCI_PUBLIC_URL` decides the
