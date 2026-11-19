@@ -18,6 +18,8 @@ permissions:
 env:
   IMAGE: docker.io/locci/docker
   PKG: github.com/MikeTeddyOmondi/locci-docker
+  # Release archives are <ARCHIVE>-<tag>-<os>-<arch>; the executable inside is locci.
+  ARCHIVE: locci-docker
 
 jobs:
   # The web UI is the same for every target: build it once.
@@ -72,12 +74,12 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: "0"
         run: |
-          name=locci-${GITHUB_REF_NAME}-${GOOS}-${GOARCH}
+          name=${ARCHIVE}-${GITHUB_REF_NAME}-${GOOS}-${GOARCH}
           ext=""; [ "$GOOS" = windows ] && ext=.exe
           mkdir -p "dist/$name"
           go build -trimpath -ldflags "-s -w -X $PKG/internal/cli.Version=$GITHUB_REF_NAME" \
             -o "dist/$name/locci$ext" ./cmd/locci
-          cp README.md LICENSE* "dist/$name/" 2>/dev/null || true
+          cp README.md MIT-LICENSE.md APACHE-LICENSE.md "dist/$name/"
           cd dist
           if [ "$GOOS" = windows ]; then zip -qr "$name.zip" "$name"; else tar czf "$name.tar.gz" "$name"; fi
           rm -rf "$name"
@@ -158,7 +160,7 @@ jobs:
 
       - name: Checksums
         working-directory: dist
-        run: sha256sum locci-* > SHA256SUMS && cat SHA256SUMS
+        run: sha256sum "$ARCHIVE"-* > SHA256SUMS && cat SHA256SUMS
 
       # The public key users verify with, from the repository (uploaded with
       # the other .asc files). The signing step fails if the key doesn't match.
@@ -181,8 +183,8 @@ jobs:
         env:
           GPG_PASSPHRASE: ${{ secrets.RELEASE_GPG_PASSPHRASE }}
         run: |
-          # The list is taken once: after signing, locci-* also matches the .asc files.
-          files=$(ls locci-* SHA256SUMS)
+          # The list is taken once: after signing, the archive pattern also matches the .asc files.
+          files=$(ls "$ARCHIVE"-* SHA256SUMS)
           for f in $files; do
             echo "$GPG_PASSPHRASE" | gpg --batch --yes --passphrase-fd 0 \
               --pinentry-mode loopback --detach-sign --armor "$f"
@@ -196,7 +198,7 @@ jobs:
 
       - uses: actions/attest-build-provenance@v2
         with:
-          subject-path: dist/locci-*
+          subject-path: dist/${{ env.ARCHIVE }}-*
 
       # The curated notes live in CHANGELOG.md: use this version's section.
       - name: Release notes
@@ -229,20 +231,20 @@ jobs:
           gpg --import release-key.asc
           gpg --verify SHA256SUMS.asc SHA256SUMS
           sha256sum -c SHA256SUMS --ignore-missing
-          gh attestation verify locci-${GITHUB_REF_NAME}-linux-amd64.tar.gz --repo ${GITHUB_REPOSITORY}
+          gh attestation verify ${ARCHIVE}-${GITHUB_REF_NAME}-linux-amd64.tar.gz --repo ${GITHUB_REPOSITORY}
           \`\`\`
           EOF
 
       - uses: softprops/action-gh-release@v2
         with:
-          name: locci ${{ github.ref_name }}
+          name: Locci Docker ${{ github.ref_name }}
           body_path: NOTES.md
           generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-') }}
           # Patterns must not overlap: a file matched twice is uploaded twice
-          # at once, and the two uploads collide. locci-* covers each archive
+          # at once, and the two uploads collide. The archive pattern covers each archive
           # and its .asc; SHA256SUMS* the checksums and theirs.
           files: |
-            dist/locci-*
+            dist/${{ env.ARCHIVE }}-*
             dist/SHA256SUMS*
             dist/release-key.asc
