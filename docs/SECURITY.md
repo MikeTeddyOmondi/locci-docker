@@ -59,6 +59,14 @@ their reach.
 - `AUTH_TOKEN` is an optional static admin token for integrations. Leave it
   empty unless you need it, and treat it like a root password. It is compared
   in constant time and never expires.
+- `locci user ...` writes straight to the database named by `DATABASE_URL`,
+  without the server (see [CLI.md](CLI.md#admin)). Users are created and
+  promoted only there or by an admin through the API: no endpoint creates
+  the first admin. So access to the database is admin access. For a local
+  file that means the host; for Turso, the `libsql://` URL and its auth
+  token are an admin key, usable from anywhere and not in locci's audit log.
+  Keep that token as secret as `AUTH_TOKEN`, scope it to this database, and
+  rotate it in Turso if it leaks.
 - Tokens go in the `Authorization` header. Only WebSocket requests (the
   console) may pass one as `?token=`, since browsers can't set headers there.
 - Request logs record the method, path and status, never the query string.
@@ -154,6 +162,7 @@ by `locci audit`. Logins are recorded too.
   `LOCCI_USER_HOST_ACCESS` off.
 - Set `LOCCI_SECRET_KEY` and back it up with the database.
 - Keep `AUTH_TOKEN` empty unless an integration needs it.
+- With Turso, keep the database auth token only on the server.
 - Create named admin accounts (`locci user add NAME --admin`) instead of
   sharing one.
 - Give remote hosts their own deploy key or client certificate, so one can be

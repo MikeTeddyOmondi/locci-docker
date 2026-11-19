@@ -8,6 +8,12 @@ the project had tagged releases, are grouped by date. Planned work lives in
 
 ## [Unreleased]
 
+### Added
+
+- Docs: installing a released binary (README), and that `locci user ...`
+  writes to the database directly, so with Turso the database token is an
+  admin key (CLI.md, SECURITY.md).
+
 ## [0.1.0] - 2026-11-19
 
 The project grows from a single-file Docker API wrapper into one `locci` binary
