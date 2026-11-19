@@ -14,6 +14,36 @@ Manage the local Docker host and any number of remote ones over TLS or SSH.
 - **Storage**: SQLite in pure Go (a local file) or remote libsql/Turso for users, tokens, environments and the audit log
 - **Deploy jobs**: optional RabbitMQ consumer
 
+## Install from a release
+
+Each [release](https://github.com/MikeTeddyOmondi/locci-docker/releases) has
+an archive per platform, `locci-docker-<version>-<os>-<arch>` (`.tar.gz`, or
+`.zip` for Windows), holding the `locci` executable, this README and the
+licenses. For example, on Linux amd64:
+
+```sh
+v=v0.1.0; a=locci-docker-$v-linux-amd64.tar.gz
+base=https://github.com/MikeTeddyOmondi/locci-docker/releases/download/$v
+curl -fLO $base/$a -fLO $base/SHA256SUMS -fLO $base/SHA256SUMS.asc -fLO $base/release-key.asc
+
+gpg --import release-key.asc                     # check the fingerprint in docs/RELEASING.md
+gpg --verify SHA256SUMS.asc SHA256SUMS
+sha256sum -c SHA256SUMS --ignore-missing         # macOS: shasum -a 256 -c SHA256SUMS --ignore-missing
+
+tar xzf $a
+sudo install locci-docker-$v-linux-amd64/locci /usr/local/bin/
+locci --version
+```
+
+Other targets: `darwin-amd64`, `darwin-arm64`, `linux-arm64`, `windows-amd64`
+and `windows-arm64`. On macOS, a file downloaded with a browser may be
+quarantined; `xattr -d com.apple.quarantine locci` clears it (curl doesn't set
+it). More checks, including build provenance:
+[docs/RELEASING.md](docs/RELEASING.md#what-is-signed-and-how-to-verify-it).
+
+Then point it at a server (`locci login --url https://locci.example.com`), or
+run one (`locci serve`, below). The Docker image is `locci/docker`.
+
 ## Quick start
 
 ```sh
