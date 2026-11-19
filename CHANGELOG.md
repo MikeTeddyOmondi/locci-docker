@@ -10,6 +10,9 @@ the project had tagged releases, are grouped by date. Planned work lives in
 
 ### Added
 
+- `install.sh`: installs `locci` from a release on Linux or macOS after
+  checking the signature on `SHA256SUMS` (key pinned by fingerprint) and the
+  archive's checksum. Meant to be downloaded and read before running.
 - Docs: installing a released binary (README), and that `locci user ...`
   writes to the database directly, so with Turso the database token is an
   admin key (CLI.md, SECURITY.md).

@@ -16,29 +16,25 @@ Manage the local Docker host and any number of remote ones over TLS or SSH.
 
 ## Install from a release
 
-Each [release](https://github.com/MikeTeddyOmondi/locci-docker/releases) has
-an archive per platform, `locci-docker-<version>-<os>-<arch>` (`.tar.gz`, or
-`.zip` for Windows), holding the `locci` executable, this README and the
-licenses. For example, on Linux amd64:
+On Linux or macOS, download the install script, read it, then run it:
 
 ```sh
-v=v0.1.0; a=locci-docker-$v-linux-amd64.tar.gz
-base=https://github.com/MikeTeddyOmondi/locci-docker/releases/download/$v
-curl -fLO $base/$a -fLO $base/SHA256SUMS -fLO $base/SHA256SUMS.asc -fLO $base/release-key.asc
-
-gpg --import release-key.asc                     # check the fingerprint in docs/RELEASING.md
-gpg --verify SHA256SUMS.asc SHA256SUMS
-sha256sum -c SHA256SUMS --ignore-missing         # macOS: shasum -a 256 -c SHA256SUMS --ignore-missing
-
-tar xzf $a
-sudo install locci-docker-$v-linux-amd64/locci /usr/local/bin/
+curl -fsSL https://raw.githubusercontent.com/MikeTeddyOmondi/locci-docker/main/install.sh -o install.sh
+less install.sh
+sh install.sh
 locci --version
 ```
 
-Other targets: `darwin-amd64`, `darwin-arm64`, `linux-arm64`, `windows-amd64`
-and `windows-arm64`. On macOS, a file downloaded with a browser may be
-quarantined; `xattr -d com.apple.quarantine locci` clears it (curl doesn't set
-it). More checks, including build provenance:
+It downloads the latest release's archive for your OS and CPU, checks the
+signature on `SHA256SUMS` against the release key (pinned by fingerprint in
+the script; skipped with a note if gpg isn't installed) and the archive's
+checksum, then copies `locci` to `/usr/local/bin`. `LOCCI_VERSION=v0.1.0`
+picks a release; `LOCCI_INSTALL_DIR=~/.local/bin` installs without sudo.
+
+Windows, or by hand: each
+[release](https://github.com/MikeTeddyOmondi/locci-docker/releases) has
+`locci-docker-<version>-<os>-<arch>` archives (`.zip` for Windows) holding
+`locci`, this README and the licenses; verifying them is in
 [docs/RELEASING.md](docs/RELEASING.md#what-is-signed-and-how-to-verify-it).
 
 Then point it at a server (`locci login --url https://locci.example.com`), or
