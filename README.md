@@ -16,20 +16,21 @@ Manage the local Docker host and any number of remote ones over TLS or SSH.
 
 ## Install from a release
 
-On Linux or macOS, download the install script, read it, then run it:
+On Linux or macOS:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/MikeTeddyOmondi/locci-docker/main/install.sh -o install.sh
-less install.sh
-sh install.sh
-locci --version
+curl -fsSL https://raw.githubusercontent.com/MikeTeddyOmondi/locci-docker/main/install.sh | bash
 ```
+
+To read [install.sh](install.sh) first, download it with `-o install.sh` and
+run `bash install.sh` instead.
 
 It downloads the latest release's archive for your OS and CPU, checks the
 signature on `SHA256SUMS` against the release key (pinned by fingerprint in
 the script; skipped with a note if gpg isn't installed) and the archive's
-checksum, then copies `locci` to `/usr/local/bin`. `LOCCI_VERSION=v0.1.0`
-picks a release; `LOCCI_INSTALL_DIR=~/.local/bin` installs without sudo.
+checksum, then copies `locci` to `/usr/local/bin`. Settings go before `bash`:
+`| LOCCI_VERSION=v0.1.0 bash` picks a release, and
+`| LOCCI_INSTALL_DIR=~/.local/bin bash` installs without sudo.
 
 Windows, or by hand: each
 [release](https://github.com/MikeTeddyOmondi/locci-docker/releases) has

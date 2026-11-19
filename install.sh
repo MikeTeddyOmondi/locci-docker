@@ -1,9 +1,9 @@
 #!/bin/sh
 # Install the locci binary from a GitHub release of locci-docker.
 #
-#   curl -fsSL https://raw.githubusercontent.com/MikeTeddyOmondi/locci-docker/main/install.sh -o install.sh
-#   less install.sh        # read it first
-#   sh install.sh
+#   curl -fsSL https://raw.githubusercontent.com/MikeTeddyOmondi/locci-docker/main/install.sh | bash
+#
+# To read it first: download it with -o install.sh, then run bash install.sh.
 #
 # Settings (environment variables):
 #   LOCCI_VERSION       release tag to install, e.g. v0.1.0 (default: the latest release)
