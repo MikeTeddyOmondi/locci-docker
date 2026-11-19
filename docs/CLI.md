@@ -3,6 +3,8 @@
 The same `locci` binary is the server and the client. Client commands talk to
 a locci server over its [HTTP API](API.md), so they work from any machine.
 
+Download it from a [release](../README.md#install-from-a-release), or build it:
+
 ```sh
 just install            # builds and installs to $GOBIN (~/go/bin)
 locci --help            # every command, grouped into Server and Client
@@ -136,6 +138,25 @@ locci user passwd mike                                # also gives an SSO-only u
 locci user rm mike
 locci auth password-login on                          # break-glass if single sign-on is broken
 ```
+
+These don't go through the server. They read `DATABASE_URL` and open the
+database themselves, so they must run where that database is:
+
+- **A local file** (`file:locci.db`, or `file:/data/locci.db` in the
+  container): run them on that host, in the container with
+  `docker exec -it locci-docker locci user add mike --admin`. Run on your own
+  machine, they would create and change an empty `locci.db` of their own.
+- **Turso** (`libsql://...?authToken=...`): they work from any machine that
+  has that URL and token, and the server never sees the change. Anyone with
+  the token can make themselves an admin; see
+  [SECURITY.md](SECURITY.md#accounts-and-tokens).
+
+This is deliberate: the first admin can only be made by someone who already
+controls the host or the database, and there is no endpoint a stranger could
+use to claim a fresh install. After that, admins add users remotely in the
+web UI (**Users**) or with `POST /api/v1/users` ([API](API.md)). For a first
+admin without shell access to the host, set `AUTH_TOKEN` on the server, call
+that route with it, then remove it.
 
 From source, `just cli <args>` runs any of these without installing, for
 example `just cli ps -E edge`.
